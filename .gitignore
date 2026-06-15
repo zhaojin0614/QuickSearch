@@ -1,0 +1,13 @@
+# 浏览器加载扩展时自动生成的元数据（DNR 规则预编译缓存等）
+_metadata/
+
+# 本项目是纯 Vanilla JS，无 npm 依赖；lock 文件为无效残留
+package-lock.json
+package.json
+
+# 系统/编辑器
+.DS_Store
+Thumbs.db
+*.log
+.vscode/
+.idea/

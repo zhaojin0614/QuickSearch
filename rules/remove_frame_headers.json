@@ -1,0 +1,155 @@
+[
+  {
+    "id": 1,
+    "priority": 1,
+    "action": {
+      "type": "modifyHeaders",
+      "responseHeaders": [
+        { "header": "x-frame-options", "operation": "remove" },
+        { "header": "content-security-policy", "operation": "remove" },
+        { "header": "content-security-policy-report-only", "operation": "remove" },
+        { "header": "frame-options", "operation": "remove" }
+      ]
+    },
+    "condition": {
+      "urlFilter": "||chatgpt.com^",
+      "resourceTypes": ["sub_frame"]
+    }
+  },
+  {
+    "id": 2,
+    "priority": 1,
+    "action": {
+      "type": "modifyHeaders",
+      "responseHeaders": [
+        { "header": "x-frame-options", "operation": "remove" },
+        { "header": "content-security-policy", "operation": "remove" },
+        { "header": "content-security-policy-report-only", "operation": "remove" },
+        { "header": "frame-options", "operation": "remove" }
+      ]
+    },
+    "condition": {
+      "urlFilter": "||chat.openai.com^",
+      "resourceTypes": ["sub_frame"]
+    }
+  },
+  {
+    "id": 3,
+    "priority": 1,
+    "action": {
+      "type": "modifyHeaders",
+      "responseHeaders": [
+        { "header": "x-frame-options", "operation": "remove" },
+        { "header": "content-security-policy", "operation": "remove" },
+        { "header": "content-security-policy-report-only", "operation": "remove" },
+        { "header": "frame-options", "operation": "remove" }
+      ]
+    },
+    "condition": {
+      "urlFilter": "||claude.ai^",
+      "resourceTypes": ["sub_frame"]
+    }
+  },
+  {
+    "id": 4,
+    "priority": 1,
+    "action": {
+      "type": "modifyHeaders",
+      "responseHeaders": [
+        { "header": "x-frame-options", "operation": "remove" },
+        { "header": "content-security-policy", "operation": "remove" },
+        { "header": "content-security-policy-report-only", "operation": "remove" },
+        { "header": "frame-options", "operation": "remove" }
+      ]
+    },
+    "condition": {
+      "urlFilter": "||gemini.google.com^",
+      "resourceTypes": ["sub_frame"]
+    }
+  },
+  {
+    "id": 5,
+    "priority": 1,
+    "action": {
+      "type": "modifyHeaders",
+      "responseHeaders": [
+        { "header": "x-frame-options", "operation": "remove" },
+        { "header": "content-security-policy", "operation": "remove" },
+        { "header": "content-security-policy-report-only", "operation": "remove" },
+        { "header": "frame-options", "operation": "remove" }
+      ]
+    },
+    "condition": {
+      "urlFilter": "||tongyi.aliyun.com^",
+      "resourceTypes": ["sub_frame"]
+    }
+  },
+  {
+    "id": 6,
+    "priority": 1,
+    "action": {
+      "type": "modifyHeaders",
+      "responseHeaders": [
+        { "header": "x-frame-options", "operation": "remove" },
+        { "header": "content-security-policy", "operation": "remove" },
+        { "header": "content-security-policy-report-only", "operation": "remove" },
+        { "header": "frame-options", "operation": "remove" }
+      ]
+    },
+    "condition": {
+      "urlFilter": "||kimi.moonshot.cn^",
+      "resourceTypes": ["sub_frame"]
+    }
+  },
+  {
+    "id": 7,
+    "priority": 1,
+    "action": {
+      "type": "modifyHeaders",
+      "responseHeaders": [
+        { "header": "x-frame-options", "operation": "remove" },
+        { "header": "content-security-policy", "operation": "remove" },
+        { "header": "content-security-policy-report-only", "operation": "remove" },
+        { "header": "frame-options", "operation": "remove" }
+      ]
+    },
+    "condition": {
+      "urlFilter": "||chat.deepseek.com^",
+      "resourceTypes": ["sub_frame"]
+    }
+  },
+  {
+    "id": 8,
+    "priority": 1,
+    "action": {
+      "type": "modifyHeaders",
+      "responseHeaders": [
+        { "header": "x-frame-options", "operation": "remove" },
+        { "header": "content-security-policy", "operation": "remove" },
+        { "header": "content-security-policy-report-only", "operation": "remove" },
+        { "header": "frame-options", "operation": "remove" }
+      ]
+    },
+    "condition": {
+      "urlFilter": "||yiyan.baidu.com^",
+      "resourceTypes": ["sub_frame"]
+    }
+  },
+  {
+    "id": 9,
+    "priority": 1,
+    "action": {
+      "type": "modifyHeaders",
+      "responseHeaders": [
+        { "header": "x-frame-options", "operation": "remove" },
+        { "header": "content-security-policy", "operation": "remove" },
+        { "header": "content-security-policy-report-only", "operation": "remove" },
+        { "header": "frame-options", "operation": "remove" }
+      ]
+    },
+    "condition": {
+      "urlFilter": "||chatglm.cn^",
+      "resourceTypes": ["sub_frame"]
+    }
+  }
+]

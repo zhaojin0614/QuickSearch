@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI 侧边栏助手</title>
+  <link rel="stylesheet" href="sidepanel.css" />
+</head>
+<body>
+  <!-- 引用预览条：当选中文字后会显示在这里 -->
+  <div id="quote-bar" class="quote-bar hidden">
+    <div class="quote-head">
+      <span class="quote-label">📌 已选中的引用</span>
+      <span class="quote-actions">
+        <button id="quote-copy" title="复制引用到剪贴板">复制</button>
+        <button id="quote-insert" title="复制并提示你到输入框按 Ctrl+V">复制并粘贴提示</button>
+        <button id="quote-clear" title="清除引用">×</button>
+      </span>
+    </div>
+    <div id="quote-text" class="quote-text" contenteditable="true" data-placeholder="（可直接编辑这段引用，+引用 / @ 会取这里的内容）"></div>
+    <div id="quote-source" class="quote-source"></div>
+  </div>
+
+  <!-- 提示词组装区：@ 引用 -->
+  <div class="composer">
+    <div class="composer-head">
+      <span class="composer-label">💬 提示词组装 <span class="composer-tip">输入 @ 引用内容</span></span>
+      <span class="composer-actions">
+        <button id="cmp-add-quote" title="引用顶部已选中的引用（可在上方编辑）">＋引用</button>
+        <button id="cmp-add-selection" title="快速引用当前选中">＋选中</button>
+        <button id="cmp-add-page" title="快速引用当前页面正文">＋页面</button>
+        <button id="cmp-clear" title="清空">清空</button>
+      </span>
+    </div>
+    <div class="editor-wrap">
+      <div id="cmp-editor" class="cmp-editor" contenteditable="true" data-placeholder="帮我总结 @ ...&#10;用 @ 引用：选中文字 / 页面正文 / 其他标签页"></div>
+    </div>
+    <div class="composer-foot">
+      <span id="cmp-stats" class="cmp-stats">0 字</span>
+      <button id="cmp-copy" class="cmp-copy primary">📋 组装并复制</button>
+    </div>
+    <!-- @ 候选菜单 -->
+    <div id="at-menu" class="at-menu hidden"></div>
+  </div>
+
+  <!-- AI 站点 tab 切换栏 -->
+  <div id="site-tabs" class="site-tabs"></div>
+
+  <!-- iframe 容器 -->
+  <div class="iframe-wrap">
+    <iframe id="ai-frame" src="about:blank" allow="clipboard-read; clipboard-write; microphone"></iframe>
+    <div id="frame-overlay" class="frame-overlay">
+      <div class="overlay-card">
+        <div class="spinner"></div>
+        <div id="overlay-text">正在加载…</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 底部工具条 -->
+  <div class="bottom-bar">
+    <button id="btn-reload" title="刷新当前 AI 页面">↻ 刷新</button>
+    <button id="btn-open-window" title="在独立窗口打开当前 AI 站点">⤢ 新窗口</button>
+    <button id="btn-options" title="打开设置">⚙ 设置</button>
+    <button id="btn-history" title="剪贴板历史">📋 历史</button>
+  </div>
+
+  <!-- toast 提示 -->
+  <div id="toast" class="toast hidden"></div>
+
+  <script src="../../lib/storage.js"></script>
+  <script src="../../lib/clipboard.js"></script>
+  <script src="sidepanel.js"></script>
+  <script src="composer.js"></script>
+</body>
+</html>

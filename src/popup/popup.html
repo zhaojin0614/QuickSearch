@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI 侧边栏助手</title>
+  <link rel="stylesheet" href="popup.css" />
+</head>
+<body>
+  <div class="header">
+    <span class="logo">🤖 AI 侧边栏助手</span>
+    <button id="btn-open-panel" class="primary" title="打开侧边栏">打开侧边栏</button>
+  </div>
+
+  <div class="section">
+    <label class="row toggle-row">
+      <span>
+        <span class="title">超级复制</span>
+        <span class="desc">破解禁止复制/右键/选择</span>
+      </span>
+      <input type="checkbox" id="set-supercopy" />
+      <span class="switch"></span>
+    </label>
+
+    <label class="row toggle-row">
+      <span>
+        <span class="title">自动复制选中</span>
+        <span class="desc">选中文字即复制到剪贴板</span>
+      </span>
+      <input type="checkbox" id="set-autocopy" />
+      <span class="switch"></span>
+    </label>
+
+    <label class="row toggle-row">
+      <span>
+        <span class="title">显示浮动按钮</span>
+        <span class="desc">选中后显示"发到侧边栏"</span>
+      </span>
+      <input type="checkbox" id="set-floatbtn" />
+      <span class="switch"></span>
+    </label>
+  </div>
+
+  <div class="section" id="site-section">
+    <div class="section-title">
+      当前站点：<span id="cur-host" class="host">—</span>
+      <button id="btn-toggle-site" class="link" title="为该站点单独开关超级复制">站点独立设置</button>
+    </div>
+    <div id="site-status" class="site-status"></div>
+  </div>
+
+  <div class="section quick">
+    <button id="btn-copy-tab" class="ghost">📋 复制当前标签</button>
+    <button id="btn-copy-all" class="ghost">📑 复制全部标签</button>
+    <button id="btn-history" class="ghost">🗂 剪贴板历史</button>
+    <button id="btn-options" class="ghost">⚙ 高级设置</button>
+  </div>
+
+  <div class="footer">Alt+1/2/3/4 · 数据仅本地存储</div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
