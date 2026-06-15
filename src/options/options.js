@@ -124,8 +124,9 @@
         '<span class="ico">' + iconHtml + '</span>' +
         '<span class="name">' + escapeHtml(s.name || '') + '</span>' +
         '<span class="url">' + escapeHtml(s.url || '') + '</span>' +
-        '<button data-act="up" title="上移">↑</button>' +
-        '<button data-act="down" title="下移">↓</button>' +
+        '<button data-act="up" title="上移">▲</button>' +
+        '<button data-act="down" title="下移">▼</button>' +
+        '<button data-act="edit" title="编辑">✎</button>' +
         '<button data-act="del" title="删除">✕</button>';
 
       if (idx === 0) row.querySelector('[data-act="up"]').disabled = true;
@@ -142,6 +143,15 @@
         [sites[idx + 1], sites[idx]] = [sites[idx], sites[idx + 1]];
         renderSites();
         scheduleSave();
+      });
+      row.querySelector('[data-act="edit"]').addEventListener('click', () => {
+        $('site-name').value = s.name || '';
+        $('site-url').value = s.url || '';
+        $('site-icon').value = s.icon || '';
+        sites.splice(idx, 1);
+        renderSites();
+        scheduleSave();
+        $('site-name').focus();
       });
       row.querySelector('[data-act="del"]').addEventListener('click', () => {
         sites.splice(idx, 1);
@@ -192,8 +202,34 @@
       row.innerHTML =
         '<span class="name" style="width: 80px; color: #4338ca; font-family: monospace;">/' + escapeHtml(p.trigger || '') + '</span>' +
         '<span class="url" style="flex: 1; color: #475569;">' + escapeHtml((p.content || '').substring(0, 30)) + '...</span>' +
+        '<button data-act="up" title="上移">▲</button>' +
+        '<button data-act="down" title="下移">▼</button>' +
+        '<button data-act="edit" title="编辑">✎</button>' +
         '<button data-act="del" title="删除">✕</button>';
       
+      if (idx === 0) row.querySelector('[data-act="up"]').disabled = true;
+      if (idx === prompts.length - 1) row.querySelector('[data-act="down"]').disabled = true;
+
+      row.querySelector('[data-act="up"]').addEventListener('click', () => {
+        if (idx === 0) return;
+        [prompts[idx - 1], prompts[idx]] = [prompts[idx], prompts[idx - 1]];
+        renderPrompts();
+        scheduleSave();
+      });
+      row.querySelector('[data-act="down"]').addEventListener('click', () => {
+        if (idx === prompts.length - 1) return;
+        [prompts[idx + 1], prompts[idx]] = [prompts[idx], prompts[idx + 1]];
+        renderPrompts();
+        scheduleSave();
+      });
+      row.querySelector('[data-act="edit"]').addEventListener('click', () => {
+        $('prompt-trigger').value = p.trigger || '';
+        $('prompt-content').value = p.content || '';
+        prompts.splice(idx, 1);
+        renderPrompts();
+        scheduleSave();
+        $('prompt-trigger').focus();
+      });
       row.querySelector('[data-act="del"]').addEventListener('click', () => {
         prompts.splice(idx, 1);
         renderPrompts();

@@ -72,10 +72,10 @@ body {
   border: none;
   color: #64748b;
   cursor: pointer;
-  font-size: 12px;
-  width: 24px;
-  height: 24px;
-  border-radius: 6px;
+  font-size: 20px;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
   display: flex;
   align-items: center;
   justify-content: center;

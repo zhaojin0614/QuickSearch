@@ -102,15 +102,25 @@ textarea {
 .site-row .name { font-weight: 500; min-width: 90px; }
 .site-row .url { flex: 1; color: #6b7280; font-size: 12px; word-break: break-all; }
 .site-row button {
-  padding: 3px 8px;
-  font-size: 12px;
-  background: #fee2e2;
-  color: #b91c1c;
+  padding: 4px 8px;
+  font-size: 14px;
+  background: #f1f5f9;
+  color: #475569;
   border: none;
-  border-radius: 4px;
+  border-radius: 6px;
   cursor: pointer;
+  transition: all 0.2s;
 }
-.site-row button:hover { background: #fecaca; }
+.site-row button:hover { background: #e2e8f0; color: #0f172a; }
+.site-row button:disabled { opacity: 0.3; cursor: not-allowed; }
+.site-row button[data-act="del"] {
+  background: #fee2e2;
+  color: #ef4444;
+}
+.site-row button[data-act="del"]:hover {
+  background: #fecaca;
+  color: #dc2626;
+}
 
 .sites-add {
   display: flex;
