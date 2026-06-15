@@ -253,6 +253,8 @@
   }
   async function setCollapsed(collapsed, skipSave) {
     topPanelEl.classList.toggle('collapsed', collapsed);
+    const btn = document.getElementById('btn-collapse');
+    if (btn) btn.textContent = collapsed ? '展开 ▾' : '折叠 ▴';
     if (!skipSave) {
       try { await chrome.storage.local.set({ [COLLAPSE_KEY]: collapsed }); } catch (e) {}
     }

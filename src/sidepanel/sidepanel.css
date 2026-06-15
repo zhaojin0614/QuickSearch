@@ -72,21 +72,23 @@ body {
   border: none;
   color: #64748b;
   cursor: pointer;
-  font-size: 20px;
-  width: 32px;
-  height: 32px;
-  border-radius: 8px;
+  font-size: 13px;
+  padding: 0 10px;
+  height: 28px;
+  border-radius: 6px;
   display: flex;
   align-items: center;
   justify-content: center;
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  font-weight: 500;
+  white-space: nowrap;
 }
 .btn-collapse:hover {
   background: #e2e8f0;
   color: #0f172a;
 }
 .top-panel.collapsed .btn-collapse {
-  transform: rotate(-90deg);
+  /* text is changed via JS, no transform needed */
 }
 /* 折叠时隐藏内容区 */
 .top-panel.collapsed .top-body {
