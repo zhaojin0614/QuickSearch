@@ -40,7 +40,7 @@
         <div class="composer-head">
           <span class="composer-label">💬 提示词组装 <span class="composer-tip">输入 @ 引用内容</span></span>
           <span class="composer-actions">
-            <button id="cmp-add-prompt" title="插入自定义提示词模板 (支持输入 / 触发)">⚡ 模板</button>
+            <button id="cmp-quick-add" title="将当前输入框内容存为模板">➕ 存为模板</button>
             <button id="cmp-add-quote" title="引用顶部已选中的引用（可在上方编辑）">＋引用</button>
             <button id="cmp-add-selection" title="快速引用当前选中">＋选中</button>
             <button id="cmp-add-page" title="快速引用当前页面正文">＋页面</button>
@@ -49,6 +49,17 @@
         </div>
         <div class="editor-wrap">
           <div id="cmp-editor" class="cmp-editor" contenteditable="true" data-placeholder="输入 / 插入模板 | 输入 @ 引用内容&#10;快捷键：@选定文字 / @页面"></div>
+        
+          <!-- 快捷添加模板面板 (默认隐藏) -->
+          <div id="cmp-quick-add-modal" class="hidden">
+            <div class="qa-title">快捷存为模板</div>
+            <input type="text" id="qa-trigger" class="qa-input" placeholder="输入触发标志，如：fy" />
+            <textarea id="qa-content" class="qa-input" placeholder="提示词内容..." rows="3"></textarea>
+            <div class="qa-actions">
+              <button id="qa-cancel" class="qa-btn qa-btn-cancel">取消</button>
+              <button id="qa-confirm" class="qa-btn qa-btn-confirm">保存模板</button>
+            </div>
+          </div>
         </div>
         <div class="composer-foot">
           <span id="cmp-stats" class="cmp-stats">0 字</span>

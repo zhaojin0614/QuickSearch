@@ -546,15 +546,38 @@
     statsEl.textContent = len >= 1000 ? (len / 1000).toFixed(1) + 'k 字' : len + ' 字';
   }
 
-  // ---------- 快捷按钮 ----------
-  document.getElementById('cmp-add-prompt').addEventListener('click', async () => {
-    if (!prompts || prompts.length === 0) {
-      showToast('暂无提示词模板，正在为你跳转设置页...', 3000);
-      setTimeout(() => chrome.runtime.openOptionsPage(), 1000);
+  // ---------- 快捷添加模板面板 ----------
+  const qaModal = document.getElementById('cmp-quick-add-modal');
+  const qaTrigger = document.getElementById('qa-trigger');
+  const qaContent = document.getElementById('qa-content');
+
+  document.getElementById('cmp-quick-add').addEventListener('click', () => {
+    const text = serializeEditor();
+    qaContent.value = text;
+    qaTrigger.value = '';
+    qaModal.classList.remove('hidden');
+    qaTrigger.focus();
+  });
+
+  document.getElementById('qa-cancel').addEventListener('click', () => {
+    qaModal.classList.add('hidden');
+  });
+
+  document.getElementById('qa-confirm').addEventListener('click', async () => {
+    const trigger = qaTrigger.value.trim();
+    const content = qaContent.value.trim();
+    if (!trigger || !content) {
+      showToast('标志和内容不能为空', 2000);
       return;
     }
-    focusEditorAtEnd();
-    renderPromptMenu(null);
+    if (prompts.find((p) => p.trigger === trigger)) {
+      showToast('标志已存在', 2000);
+      return;
+    }
+    prompts.push({ trigger, content });
+    await storage.savePrompts(prompts);
+    qaModal.classList.add('hidden');
+    showToast('模板保存成功！', 2000);
   });
 
   // +引用：取顶部 quote-bar（可编辑）的当前内容

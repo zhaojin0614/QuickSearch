@@ -495,9 +495,76 @@ body {
   text-overflow: ellipsis;
 }
 .at-item .at-sub {
-  font-size: 10px;
-  color: #9ca3af;
+  font-size: 12px;
+  color: #64748b;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+/* 快捷添加模板面板 */
+#cmp-quick-add-modal {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  right: 10px;
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+  padding: 12px;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+#cmp-quick-add-modal.hidden {
+  display: none;
+}
+.qa-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #334155;
+  margin-bottom: 2px;
+}
+.qa-input {
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  padding: 8px;
+  font-size: 13px;
+  font-family: inherit;
+  outline: none;
+  width: 100%;
+  box-sizing: border-box;
+  background: #f8fafc;
+  resize: vertical;
+}
+.qa-input:focus {
+  border-color: #6366f1;
+  background: white;
+}
+.qa-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 4px;
+}
+.qa-btn {
+  padding: 6px 14px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  border: none;
+  transition: all 0.2s;
+}
+.qa-btn-cancel {
+  background: #f1f5f9;
+  color: #475569;
+}
+.qa-btn-cancel:hover { background: #e2e8f0; }
+.qa-btn-confirm {
+  background: #6366f1;
+  color: white;
+}
+.qa-btn-confirm:hover { background: #4f46e5; }
