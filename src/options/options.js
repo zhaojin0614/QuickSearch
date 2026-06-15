@@ -17,6 +17,7 @@
 
   let settings = null;
   let sites = null;
+  let prompts = [];
 
   const $ = (id) => document.getElementById(id);
 
@@ -43,7 +44,10 @@
     $('opt-showFloatBtn').checked = !!settings.showFloatBtn;
     $('opt-showLauncher').checked = settings.showLauncher !== false;
 
+    prompts = (await storage.getPrompts()) || [];
+
     renderSites();
+    renderPrompts();
     renderOverrides();
   }
 
@@ -119,6 +123,44 @@
     renderSites();
   });
 
+  // ---------- 提示词模板 ----------
+  function renderPrompts() {
+    const list = $('prompts-list');
+    list.innerHTML = '';
+    prompts.forEach((p, idx) => {
+      const row = document.createElement('div');
+      row.className = 'site-row'; // 复用 site-row 样式
+      row.innerHTML =
+        '<span class="name" style="width: 80px; color: #4338ca; font-family: monospace;">/' + escapeHtml(p.trigger || '') + '</span>' +
+        '<span class="url" style="flex: 1; color: #475569;">' + escapeHtml((p.content || '').substring(0, 30)) + '...</span>' +
+        '<button data-act="del" title="删除">✕</button>';
+      
+      row.querySelector('[data-act="del"]').addEventListener('click', () => {
+        prompts.splice(idx, 1);
+        renderPrompts();
+      });
+      list.appendChild(row);
+    });
+  }
+
+  $('btn-prompt-add').addEventListener('click', () => {
+    const trigger = $('prompt-trigger').value.trim();
+    const content = $('prompt-content').value.trim();
+    if (!trigger || !content) {
+      status('标志和内容不能为空', true);
+      return;
+    }
+    // 检查重复
+    if (prompts.find((p) => p.trigger === trigger)) {
+      status('标志已存在', true);
+      return;
+    }
+    prompts.push({ trigger, content });
+    $('prompt-trigger').value = '';
+    $('prompt-content').value = '';
+    renderPrompts();
+  });
+
   // ---------- 保存 ----------
   $('btn-save').addEventListener('click', async () => {
     // 解析 overrides
@@ -151,6 +193,7 @@
     try {
       await storage.saveSettings(patch);
       await storage.saveSites(sites);
+      await storage.savePrompts(prompts);
       chrome.runtime.sendMessage({ type: 'AISA_SETTINGS_CHANGED' }).catch(() => {});
       status('所有设置已保存成功！');
     } catch (e) {

@@ -40,6 +40,7 @@
         <div class="composer-head">
           <span class="composer-label">💬 提示词组装 <span class="composer-tip">输入 @ 引用内容</span></span>
           <span class="composer-actions">
+            <button id="cmp-add-prompt" title="插入自定义提示词模板 (支持输入 / 触发)">⚡ 模板</button>
             <button id="cmp-add-quote" title="引用顶部已选中的引用（可在上方编辑）">＋引用</button>
             <button id="cmp-add-selection" title="快速引用当前选中">＋选中</button>
             <button id="cmp-add-page" title="快速引用当前页面正文">＋页面</button>
@@ -47,7 +48,7 @@
           </span>
         </div>
         <div class="editor-wrap">
-          <div id="cmp-editor" class="cmp-editor" contenteditable="true" data-placeholder="帮我总结 @ ...&#10;用 @ 引用：选中文字 / 页面正文 / 其他标签页"></div>
+          <div id="cmp-editor" class="cmp-editor" contenteditable="true" data-placeholder="输入 / 插入模板 | 输入 @ 引用内容&#10;快捷键：@选定文字 / @页面"></div>
         </div>
         <div class="composer-foot">
           <span id="cmp-stats" class="cmp-stats">0 字</span>

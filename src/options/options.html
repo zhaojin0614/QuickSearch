@@ -83,6 +83,19 @@
     </section>
 
     <section class="card">
+      <h2>自定义提示词模板</h2>
+      <p class="hint">配置后，可在侧边栏的组装输入框内一键插入，或键入 <code>/触发标志</code> 快速匹配。</p>
+      <div id="prompts-list" class="prompts-list"></div>
+      <div class="prompts-add" style="display: flex; gap: 8px; margin-top: 12px; flex-direction: column;">
+        <div style="display: flex; gap: 8px;">
+          <input type="text" id="prompt-trigger" placeholder="触发标志 (如 fy)" style="width: 160px;" />
+          <button id="btn-prompt-add">添加模板</button>
+        </div>
+        <textarea id="prompt-content" rows="3" placeholder="提示词内容 (如：请将以下内容翻译为中文：)" style="resize: vertical; padding: 8px; font-family: inherit; border: 1px solid #cbd5e1; border-radius: 6px; outline: none; transition: border-color 0.2s;"></textarea>
+      </div>
+    </section>
+
+    <section class="card">
       <h2>站点级超级复制</h2>
       <p class="hint">为特定域名单独设置（优先级高于全局）。格式：每行一个域名，前加 <code>+</code> 强制开启，<code>-</code> 强制关闭。</p>
       <textarea id="opt-overrides" rows="4" placeholder="+wenku.baidu.com&#10;-example.com"></textarea>

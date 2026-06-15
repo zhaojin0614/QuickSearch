@@ -409,6 +409,19 @@ body {
 .cmp-chip .chip-x:hover {
   color: #4338ca;
 }
+
+/* 提示词模块（紫色高亮） */
+.cmp-chip-prompt {
+  background: #faf5ff;
+  color: #7e22ce;
+  border-color: #e9d5ff;
+}
+.cmp-chip-prompt .chip-x {
+  color: #a855f7;
+}
+.cmp-chip-prompt .chip-x:hover {
+  color: #7e22ce;
+}
 .composer-foot {
   display: flex;
   justify-content: space-between;

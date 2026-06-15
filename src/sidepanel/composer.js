@@ -20,6 +20,8 @@
   // 引用数据缓存：id → { kind, label, text }
   const refs = new Map();
   let refSeq = 0;
+  
+  let prompts = [];
 
   // ---------- 工具 ----------
   function showToast(msg, duration) {
@@ -40,7 +42,7 @@
     sel.addRange(range);
   }
 
-  // 读取光标前缀，用于检测 @ 触发与查询词
+  // 读取光标前缀，用于检测 @ 或 / 触发与查询词
   function getAtContext() {
     const sel = window.getSelection();
     if (!sel || sel.rangeCount === 0) return null;
@@ -49,17 +51,18 @@
     const node = range.startContainer;
     if (node.nodeType !== Node.TEXT_NODE) return null;
     const text = node.textContent.slice(0, range.startOffset);
-    const match = text.match(/@([^\s@]*)$/);
+    const match = text.match(/([@/、／])([^\s@/、／]*)$/);
     if (!match) return null;
-    return { query: match[1], atStart: range.startOffset - match[0].length, textNode: node };
+    const triggerChar = match[1] === '@' ? '@' : '/';
+    return { triggerChar: triggerChar, rawTrigger: match[1], query: match[2], atStart: range.startOffset - match[0].length, textNode: node };
   }
 
-  // 删除光标前的 @xxx（用于选中候选后替换为芯片）
+  // 删除光标前的 @xxx 或 /xxx
   function removeAtToken(ctx) {
     if (!ctx) return;
     const node = ctx.textNode;
     const before = node.textContent.slice(0, ctx.atStart);
-    const after = node.textContent.slice(ctx.atStart + ('@' + ctx.query).length);
+    const after = node.textContent.slice(ctx.atStart + (ctx.rawTrigger + ctx.query).length);
     node.textContent = before + after;
     // 把光标放到删除点
     const range = document.createRange();
@@ -76,10 +79,13 @@
     refs.set(id, ref);
 
     const chip = document.createElement('span');
-    chip.className = 'cmp-chip';
+    chip.className = 'cmp-chip' + (ref.kind === 'prompt' ? ' cmp-chip-prompt' : '');
     chip.setAttribute('contenteditable', 'false');
     chip.setAttribute('data-ref', id);
-    chip.innerHTML = '@' + escapeHtml(ref.label) + '<span class="chip-x" title="移除">×</span>';
+    
+    // 如果是提示词，label自带有 '/' 前缀，引用则补上 '@'
+    const prefix = ref.kind === 'prompt' ? '' : '@';
+    chip.innerHTML = prefix + escapeHtml(ref.label) + '<span class="chip-x" title="移除">×</span>';
 
     chip.querySelector('.chip-x').addEventListener('click', (e) => {
       e.preventDefault();
@@ -103,7 +109,8 @@
     // 空格
     const space = document.createTextNode('\u00a0');
     chip.after(space);
-    range.setStartAfter(space);
+    // 将光标严格定位在空格文本节点内部的末尾，防止 contenteditable 迷失焦点
+    range.setStart(space, 1);
     range.collapse(true);
     sel.removeAllRanges();
     sel.addRange(range);
@@ -218,6 +225,73 @@
 
     atMenu.classList.remove('hidden');
     positionAtMenu();
+  }
+
+  // ---------- / 自定义提示词菜单 ----------
+  function renderPromptMenu(ctx) {
+    const query = (ctx && ctx.query) ? ctx.query.toLowerCase() : '';
+    const filtered = prompts.filter(p => p.trigger.toLowerCase().includes(query) || p.content.toLowerCase().includes(query));
+    
+    if (!filtered.length && query) {
+      hideAtMenu();
+      return;
+    }
+
+    atMenu.innerHTML = '';
+    const g = document.createElement('div');
+    g.className = 'at-group';
+    g.textContent = '自定义提示词模板 (输入 / 快速匹配)';
+    atMenu.appendChild(g);
+
+    if (!filtered.length) {
+      const row = document.createElement('div');
+      row.className = 'at-item active';
+      row.innerHTML =
+        '<span class="at-ico">⚙️</span>' +
+        '<span class="at-main">' +
+          '<span class="at-title">去设置页添加模板...</span>' +
+        '</span>';
+      row.addEventListener('mousedown', (e) => e.preventDefault());
+      row.addEventListener('click', () => {
+        hideAtMenu();
+        chrome.runtime.openOptionsPage();
+      });
+      atMenu.appendChild(row);
+    } else {
+      filtered.forEach((it, idx) => {
+        const row = document.createElement('div');
+        row.className = 'at-item' + (idx === 0 ? ' active' : '');
+        row.innerHTML =
+          '<span class="at-ico">⚡</span>' +
+          '<span class="at-main">' +
+            '<span class="at-title">/' + escapeHtml(it.trigger) + '</span>' +
+            '<span class="at-sub">' + escapeHtml(truncate(it.content.replace(/\s+/g, ' '), 30)) + '</span>' +
+          '</span>';
+        row.addEventListener('mouseenter', () => {
+          Array.from(atMenu.querySelectorAll('.at-item')).forEach((el) => el.classList.remove('active'));
+          row.classList.add('active');
+        });
+        row.addEventListener('mousedown', (e) => e.preventDefault());
+        row.addEventListener('click', () => choosePrompt(it, ctx));
+        atMenu.appendChild(row);
+      });
+    }
+
+    atMenu.classList.remove('hidden');
+    positionAtMenu();
+  }
+
+  function choosePrompt(p, ctx) {
+    hideAtMenu();
+    if (ctx) removeAtToken(ctx);
+    
+    // 作为“芯片”插入，保持输入框清爽
+    insertChip({
+      kind: 'prompt',
+      label: '/' + p.trigger,
+      text: p.content
+    });
+    updateStats();
   }
 
   // 把 @ 菜单定位到编辑器正下方，向下延伸；
@@ -445,11 +519,17 @@
         const tag = node.tagName.toLowerCase();
         if (tag === 'br') {
           out += '\n';
-        } else if (node.classList && node.classList.contains('cmp-chip')) {
-          const id = node.getAttribute('data-ref');
-          const ref = refs.get(id);
+        } else if (node.classList.contains('cmp-chip')) {
+          const refId = node.getAttribute('data-ref');
+          const ref = refs.get(refId);
           if (ref) {
-            out += '\n' + renderRefBlock(ref) + '\n';
+            if (ref.kind === 'prompt') {
+              if (out && !out.endsWith('\n')) out += ' ';
+              out += ref.text;
+              if (!out.endsWith('\n')) out += ' ';
+            } else {
+              out += `\n"""${ref.label}\n${ref.text}\n"""\n`;
+            }
           }
         } else {
           out += node.textContent;
@@ -460,14 +540,6 @@
     return out.replace(/\u00a0/g, ' ').replace(/\n{3,}/g, '\n\n').trim();
   }
 
-  function renderRefBlock(ref) {
-    const header = ref.meta && ref.meta.title
-      ? '【' + ref.label + '】' + ref.meta.title + (ref.meta.url ? '\n来源：' + ref.meta.url : '')
-      : '【' + ref.label + '】' + (ref.source ? '\n来源：' + ref.source : '');
-    const body = ref.text || '(空)';
-    return header + '\n' + body + (ref.meta && ref.meta.truncated ? '\n…(正文已截断)' : '');
-  }
-
   function updateStats() {
     const text = serializeEditor();
     const len = text.length;
@@ -475,6 +547,16 @@
   }
 
   // ---------- 快捷按钮 ----------
+  document.getElementById('cmp-add-prompt').addEventListener('click', async () => {
+    if (!prompts || prompts.length === 0) {
+      showToast('暂无提示词模板，正在为你跳转设置页...', 3000);
+      setTimeout(() => chrome.runtime.openOptionsPage(), 1000);
+      return;
+    }
+    focusEditorAtEnd();
+    renderPromptMenu(null);
+  });
+
   // +引用：取顶部 quote-bar（可编辑）的当前内容
   document.getElementById('cmp-add-quote').addEventListener('click', async () => {
     focusEditorAtEnd();
@@ -530,8 +612,12 @@
     updateStats();
     const ctx = getAtContext();
     if (ctx) {
-      // 首次打开，不预加载 tabs（避免每次都查）；用户输入 @ 后按需展开
-      renderAtMenu(ctx, null);
+      if (ctx.triggerChar === '/') {
+        renderPromptMenu(ctx);
+      } else {
+        // 首次打开，不预加载 tabs（避免每次都查）；用户输入 @ 后按需展开
+        renderAtMenu(ctx, null);
+      }
     } else {
       hideAtMenu();
     }
@@ -581,6 +667,13 @@
       return url.hostname + (url.pathname === '/' ? '' : url.pathname.slice(0, 20));
     } catch (e) { return ''; }
   }
+  function getIconForKind(k) {
+    if (k === 'selection') return '📄';
+    if (k === 'page') return '🌐';
+    if (k === 'quote') return '💬';
+    if (k === 'prompt') return '✨';
+    return '🔗';
+  }
   function fmtTime(ts) {
     if (!ts) return '';
     try {
@@ -595,9 +688,17 @@
 
   // 暴露给外部（sidepanel.js / background 转发的消息）调用的接口
   window.AISA = window.AISA || {};
-  window.AISA.initComposer = function () {
+  window.AISA.initComposer = async function () {
     updateStats();
+    prompts = (await storage.getPrompts()) || [];
   };
+  
+  // 监听设置更新重新拉取 prompts
+  chrome.runtime.onMessage.addListener((msg) => {
+    if (msg && msg.type === 'AISA_SETTINGS_CHANGED') {
+      storage.getPrompts().then(p => prompts = p || []);
+    }
+  });
   // 外部插入一条引用（如网页浮动按钮"加到组装"）
   // ref: { label, text, source }
   window.AISA.addRefToComposer = function (ref) {
