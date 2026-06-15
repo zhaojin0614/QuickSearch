@@ -71,11 +71,8 @@ function notify(title, message) {
 
 // ===== 启动时设置：点击图标打开侧边栏 =====
 // 策略：全局 enabled: true（保证图标点击始终能打开面板），
-// 通过 tabs.onActivated 在切换到未打开过侧边栏的标签时关闭面板。
+// 通过 onCreated 防止新标签页克隆侧边栏状态，从而实现真实的独立按标签页显示。
 const PANEL_PATH = 'src/sidepanel/sidepanel.html';
-
-// 记录哪些 tabId 用户主动打开过侧边栏
-const panelOpenTabs = new Set();
 
 // 为指定 tab 配置 sidePanel（始终 enabled: true）
 async function setupTabPanel(tabId) {
@@ -127,41 +124,21 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   }
 });
 
-// ===== 核心：切换标签时，如果目标标签没有主动打开过侧边栏，则关闭面板 =====
-chrome.tabs.onActivated.addListener(async (activeInfo) => {
-  const tabId = activeInfo.tabId;
-  if (!tabId || tabId <= 0) return;
-  if (!chrome.sidePanel || !chrome.sidePanel.setOptions) return;
-
-  if (panelOpenTabs.has(tabId)) {
-    // 该 tab 主动打开过侧边栏，确保 enabled
-    try {
-      await chrome.sidePanel.setOptions({ tabId, path: PANEL_PATH, enabled: true });
-    } catch (e) {}
-  } else {
-    // 该 tab 没打开过侧边栏：先 disable（关闭面板），再 enable（恢复可点击）
-    try {
-      await chrome.sidePanel.setOptions({ tabId, path: PANEL_PATH, enabled: false });
-    } catch (e) {}
-    // 短暂延时后重新启用，确保 Chrome 有时间处理关闭
-    setTimeout(async () => {
-      try {
-        await chrome.sidePanel.setOptions({ tabId, path: PANEL_PATH, enabled: true });
-      } catch (e) {}
-    }, 300);
+// ===== 核心修复：防止 Chrome 自动将侧边栏状态克隆到新标签页 =====
+chrome.tabs.onCreated.addListener((tab) => {
+  if (tab.id && tab.id > 0) {
+    if (!chrome.sidePanel || !chrome.sidePanel.setOptions) return;
+    // 新建标签页时，先强制关闭侧边栏（覆盖 Chrome 的默认克隆行为）
+    chrome.sidePanel.setOptions({ tabId: tab.id, enabled: false }).then(() => {
+      // 延迟 300ms 后恢复可点击状态（此时它处于关闭状态，但用户可以点击图标打开）
+      setTimeout(() => {
+        chrome.sidePanel.setOptions({ tabId: tab.id, path: PANEL_PATH, enabled: true }).catch(() => {});
+      }, 300);
+    }).catch(() => {});
   }
-});
-
-// 标签关闭时清理记录
-chrome.tabs.onRemoved.addListener((tabId) => {
-  panelOpenTabs.delete(tabId);
 });
 
 async function openSidePanel(windowId, tabId) {
-  // 标记该 tab 打开了侧边栏
-  if (tabId && tabId > 0) {
-    panelOpenTabs.add(tabId);
-  }
   if (chrome.sidePanel && chrome.sidePanel.open) {
     try {
       if (windowId != null) {
