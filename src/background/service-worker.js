@@ -70,10 +70,14 @@ function notify(title, message) {
 }
 
 // ===== 启动时设置：点击图标打开侧边栏 =====
-// 为每个标签页配置独立的 sidePanel 实例（setOptions 带 tabId），
-// 这样切标签时 Chrome 自动切换实例，各自的 AI 网页状态独立保留、不重载。
+// 策略：全局 enabled: true（保证图标点击始终能打开面板），
+// 通过 tabs.onActivated 在切换到未打开过侧边栏的标签时关闭面板。
 const PANEL_PATH = 'src/sidepanel/sidepanel.html';
 
+// 记录哪些 tabId 用户主动打开过侧边栏
+const panelOpenTabs = new Set();
+
+// 为指定 tab 配置 sidePanel（始终 enabled: true）
 async function setupTabPanel(tabId) {
   if (!chrome.sidePanel || !chrome.sidePanel.setOptions) return;
   try {
@@ -87,15 +91,6 @@ async function setupTabPanel(tabId) {
   }
 }
 
-async function setupAllTabsPanel() {
-  try {
-    const tabs = await chrome.tabs.query({});
-    for (const t of tabs) {
-      if (t.id && t.id > 0) await setupTabPanel(t.id);
-    }
-  } catch (e) {}
-}
-
 chrome.runtime.onInstalled.addListener(async () => {
   if (chrome.sidePanel && chrome.sidePanel.setPanelBehavior) {
     try {
@@ -104,25 +99,22 @@ chrome.runtime.onInstalled.addListener(async () => {
       // 某些版本不支持，忽略
     }
   }
-  // 全局默认 panel（兜底，未配置 tabId 的标签用这个）
+  // 全局默认 panel（enabled: true，保证图标可点击打开）
   if (chrome.sidePanel && chrome.sidePanel.setOptions) {
     try {
       await chrome.sidePanel.setOptions({ path: PANEL_PATH, enabled: true });
     } catch (e) {}
   }
-  // 为所有现有标签配置独立实例
-  await setupAllTabsPanel();
   createContextMenu();
 });
 
 chrome.runtime.onStartup.addListener(async () => {
-  await setupAllTabsPanel();
+  if (chrome.sidePanel && chrome.sidePanel.setOptions) {
+    try {
+      await chrome.sidePanel.setOptions({ path: PANEL_PATH, enabled: true });
+    } catch (e) {}
+  }
   createContextMenu();
-});
-
-// 新标签创建时配置独立 sidePanel 实例
-chrome.tabs.onCreated.addListener((tab) => {
-  if (tab.id && tab.id > 0) setupTabPanel(tab.id);
 });
 
 // 标签导航到新页面时，重新配置（保证 sidePanel 在该 tab 可用）
@@ -130,6 +122,63 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   if (changeInfo.status === 'complete' && tabId > 0) {
     setupTabPanel(tabId);
   }
+});
+
+// ===== 核心：切换标签时，如果目标标签没有主动打开过侧边栏，则关闭面板 =====
+chrome.tabs.onActivated.addListener(async (activeInfo) => {
+  const tabId = activeInfo.tabId;
+  if (!tabId || tabId <= 0) return;
+  if (!chrome.sidePanel || !chrome.sidePanel.setOptions) return;
+
+  if (panelOpenTabs.has(tabId)) {
+    // 该 tab 主动打开过侧边栏，确保 enabled
+    try {
+      await chrome.sidePanel.setOptions({ tabId, path: PANEL_PATH, enabled: true });
+    } catch (e) {}
+  } else {
+    // 该 tab 没打开过侧边栏：先 disable（关闭面板），再 enable（恢复可点击）
+    try {
+      await chrome.sidePanel.setOptions({ tabId, path: PANEL_PATH, enabled: false });
+    } catch (e) {}
+    // 短暂延时后重新启用，确保 Chrome 有时间处理关闭
+    setTimeout(async () => {
+      try {
+        await chrome.sidePanel.setOptions({ tabId, path: PANEL_PATH, enabled: true });
+      } catch (e) {}
+    }, 300);
+  }
+});
+
+// 标签关闭时清理记录
+chrome.tabs.onRemoved.addListener((tabId) => {
+  panelOpenTabs.delete(tabId);
+});
+
+async function openSidePanel(windowId, tabId) {
+  // 标记该 tab 打开了侧边栏
+  if (tabId && tabId > 0) {
+    panelOpenTabs.add(tabId);
+  }
+  if (chrome.sidePanel && chrome.sidePanel.open) {
+    try {
+      if (windowId != null) {
+        await chrome.sidePanel.open({ windowId });
+      } else {
+        await chrome.sidePanel.open();
+      }
+    } catch (e) {
+      // open() 可能在某些环境不可用，忽略
+    }
+  }
+}
+
+// 点击 action 图标（openPanelOnActionClick: true 时 Chrome 直接打开面板，
+// 此回调仅在 openPanelOnActionClick 无效的旧版 Chrome 上触发）
+chrome.action.onClicked.addListener(async (tab) => {
+  if (tab.id && tab.id > 0) {
+    panelOpenTabs.add(tab.id);
+  }
+  await openSidePanel(tab.windowId, tab.id);
 });
 
 // ===== 右键菜单 =====
@@ -161,14 +210,14 @@ function createContextMenu() {
 chrome.contextMenus.onClicked.addListener(async (info, tab) => {
   switch (info.menuItemId) {
     case 'aisa-open-panel':
-      openSidePanel(tab && tab.windowId);
+      openSidePanel(tab && tab.windowId, tab && tab.id);
       break;
     case 'aisa-send-quote':
       if (info.selectionText) {
         await chrome.storage.local.set({
           aisa_last_quote: { text: info.selectionText, source: tab ? tab.title : '', time: Date.now() }
         });
-        openSidePanel(tab && tab.windowId);
+        openSidePanel(tab && tab.windowId, tab && tab.id);
         // 也尝试直接通过消息推送给已打开的 sidepanel
         chrome.runtime.sendMessage({
           type: 'AISA_QUOTE',
@@ -189,34 +238,21 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
   }
 });
 
-async function openSidePanel(windowId) {
-  if (chrome.sidePanel && chrome.sidePanel.open) {
-    try {
-      if (windowId != null) {
-        await chrome.sidePanel.open({ windowId });
-      } else {
-        await chrome.sidePanel.open();
-      }
-    } catch (e) {
-      // 兜底：setOptions
-      try {
-        await chrome.sidePanel.setOptions({
-          path: 'src/sidepanel/sidepanel.html',
-          enabled: true
-        });
-      } catch (_) {}
-    }
-  }
-}
-
-// 点击 action 图标（部分版本仍会触发；setPanelBehavior 已处理）
-chrome.action.onClicked.addListener((tab) => {
-  openSidePanel(tab.windowId);
-});
 
 // ===== content → sidepanel 引用转发 =====
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
-  if (msg && msg.type === 'AISA_QUOTE') {
+  if (msg && msg.type === 'AISA_PANEL_OPENED') {
+    // 侧边栏页面加载时通知：标记当前活动标签已打开侧边栏
+    const tabId = msg.tabId;
+    if (tabId && tabId > 0) {
+      panelOpenTabs.add(tabId);
+      // 确保该 tab 的 panel 是启用的
+      if (chrome.sidePanel && chrome.sidePanel.setOptions) {
+        chrome.sidePanel.setOptions({ tabId, path: PANEL_PATH, enabled: true }).catch(() => {});
+      }
+    }
+    sendResponse({ ok: true });
+  } else if (msg && msg.type === 'AISA_QUOTE') {
     // 转发给 sidepanel（若已打开）以及其他监听者
     chrome.runtime.sendMessage(msg).catch(() => {});
     // 同时持久化，sidepanel 打开后可恢复
@@ -227,7 +263,8 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   } else if (msg && msg.type === 'AISA_OPEN_PANEL_FROM_FLOAT') {
     // 来自页面悬浮启动器：为来源 tab 所在窗口打开侧边栏
     const windowId = sender.tab ? sender.tab.windowId : undefined;
-    openSidePanel(windowId)
+    const tabId = sender.tab ? sender.tab.id : undefined;
+    openSidePanel(windowId, tabId)
       .then(() => sendResponse({ ok: true }))
       .catch(() => sendResponse({ ok: false }));
     return true;
@@ -260,7 +297,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     sendResponse({ sites: DEFAULT_SITES });
     return false;
   } else if (msg && msg.type === 'AISA_OPEN_PANEL') {
-    openSidePanel(msg.windowId)
+    openSidePanel(msg.windowId, msg.tabId)
       .then(() => sendResponse({ ok: true }))
       .catch(() => sendResponse({ ok: false }));
     return true;

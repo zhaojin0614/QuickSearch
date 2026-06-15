@@ -282,6 +282,11 @@
       currentTabId = null;
     }
 
+    // 通知 service worker：当前 tab 已打开侧边栏（用于跨标签页状态跟踪）
+    if (currentTabId) {
+      chrome.runtime.sendMessage({ type: 'AISA_PANEL_OPENED', tabId: currentTabId }).catch(() => {});
+    }
+
     // 恢复站点（按 tab → window → global 兜底）。
     // 因为每个标签是独立实例，切标签由 Chrome 切实例完成，不会重载本实例。
     let restoreSite = null;
