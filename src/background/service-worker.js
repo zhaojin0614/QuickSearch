@@ -155,9 +155,6 @@ async function openSidePanel(windowId, tabId) {
 // 点击 action 图标（openPanelOnActionClick: true 时 Chrome 直接打开面板，
 // 此回调仅在 openPanelOnActionClick 无效的旧版 Chrome 上触发）
 chrome.action.onClicked.addListener(async (tab) => {
-  if (tab.id && tab.id > 0) {
-    panelOpenTabs.add(tab.id);
-  }
   await openSidePanel(tab.windowId, tab.id);
 });
 
@@ -225,7 +222,6 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     // 侧边栏页面加载时通知：标记当前活动标签已打开侧边栏
     const tabId = msg.tabId;
     if (tabId && tabId > 0) {
-      panelOpenTabs.add(tabId);
       // 确保该 tab 的 panel 是启用的
       if (chrome.sidePanel && chrome.sidePanel.setOptions) {
         chrome.sidePanel.setOptions({ tabId, path: PANEL_PATH, enabled: true }).catch(() => {});
