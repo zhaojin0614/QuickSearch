@@ -8,16 +8,16 @@
   const storage = window.AISA.storage;
   const clipboard = window.AISA.clipboard;
 
-  // 默认站点（与 lib/sites.js 保持同步；此处内联以防未加载该文件）
+  // 默认站点
   const DEFAULT_SITES = [
-    { id: 'chatgpt', name: 'ChatGPT', url: 'https://chatgpt.com/', icon: '🤖' },
-    { id: 'claude', name: 'Claude', url: 'https://claude.ai/new', icon: '🦙' },
-    { id: 'gemini', name: 'Gemini', url: 'https://gemini.google.com/app', icon: '✦' },
-    { id: 'deepseek', name: 'DeepSeek', url: 'https://chat.deepseek.com/', icon: '🐳' },
-    { id: 'tongyi', name: '通义千问', url: 'https://tongyi.aliyun.com/qianwen/', icon: '🧠' },
-    { id: 'kimi', name: 'Kimi', url: 'https://kimi.moonshot.cn/', icon: '🌙' },
-    { id: 'glm', name: '智谱清言', url: 'https://chatglm.cn/main/alltoolsdetail', icon: '🟢' },
-    { id: 'yiyan', name: '文心一言', url: 'https://yiyan.baidu.com/', icon: '🍃' }
+    { id: 'chatgpt', name: 'ChatGPT', url: 'https://chatgpt.com/', icon: '../../assets/site-icons/chatgpt.png' },
+    { id: 'claude', name: 'Claude', url: 'https://claude.ai/new', icon: '../../assets/site-icons/claude.png' },
+    { id: 'gemini', name: 'Gemini', url: 'https://gemini.google.com/app', icon: '../../assets/site-icons/gemini.png' },
+    { id: 'deepseek', name: 'DeepSeek', url: 'https://chat.deepseek.com/', icon: '../../assets/site-icons/deepseek.png' },
+    { id: 'tongyi', name: '通义千问', url: 'https://tongyi.aliyun.com/qianwen/', icon: '../../assets/site-icons/tongyi.png' },
+    { id: 'kimi', name: 'Kimi', url: 'https://kimi.moonshot.cn/', icon: '../../assets/site-icons/kimi.png' },
+    { id: 'glm', name: '智谱清言', url: 'https://chatglm.cn/main/alltoolsdetail', icon: '../../assets/site-icons/glm.png' },
+    { id: 'yiyan', name: '文心一言', url: 'https://yiyan.baidu.com/', icon: '../../assets/site-icons/yiyan.png' }
   ];
 
   const tabsEl = document.getElementById('site-tabs');
@@ -110,7 +110,15 @@
       const btn = document.createElement('button');
       btn.className = 'site-tab';
       btn.dataset.id = site.id;
-      btn.innerHTML = '<span class="ico">' + (site.icon || '•') + '</span><span>' + escapeHtml(site.name) + '</span>';
+      
+      let iconHtml = '';
+      if (site.icon && site.icon.includes('/')) {
+        iconHtml = `<img src="${site.icon}" class="site-icon-img" alt="${escapeHtml(site.name)}" onerror="this.src='../../assets/icons/icon-16.png'">`;
+      } else {
+        iconHtml = site.icon || '•';
+      }
+      
+      btn.innerHTML = '<span class="ico">' + iconHtml + '</span><span>' + escapeHtml(site.name) + '</span>';
       btn.addEventListener('click', () => selectSite(site));
       tabsEl.appendChild(btn);
     });

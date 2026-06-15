@@ -7,10 +7,10 @@ body {
   margin: 0;
   padding: 0;
   height: 100%;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Microsoft YaHei', sans-serif;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   font-size: 13px;
   color: #1f2937;
-  background: #f3f4f6;
+  background: #f8fafc;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -19,26 +19,40 @@ body {
 /* ---------- 顶部可折叠面板 ---------- */
 .top-panel {
   flex: 0 0 auto;
-  background: #fff;
-  border-bottom: 1px solid #e5e7eb;
+  background: #ffffff;
+  border-bottom: 1px solid #e2e8f0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  z-index: 10;
 }
 .top-toggle {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 6px 12px;
-  background: linear-gradient(135deg, #eef2ff, #ede9fe);
+  padding: 8px 14px;
+  background: #ffffff;
   cursor: pointer;
   user-select: none;
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid #f1f5f9;
+  transition: background 0.2s;
 }
 .top-toggle:hover {
-  background: linear-gradient(135deg, #e0e7ff, #ddd6fe);
+  background: #f8fafc;
 }
 .top-toggle-title {
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 600;
-  color: #4338ca;
+  color: #0f172a;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.top-toggle-title::before {
+  content: '';
+  display: inline-block;
+  width: 4px;
+  height: 14px;
+  background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+  border-radius: 2px;
 }
 .top-toggle-right {
   display: flex;
@@ -47,20 +61,29 @@ body {
 }
 .top-hint {
   font-size: 11px;
-  color: #6b7280;
-  max-width: 180px;
+  color: #64748b;
+  max-width: 160px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 .btn-collapse {
-  background: transparent;
+  background: #f1f5f9;
   border: none;
-  color: #4338ca;
+  color: #64748b;
   cursor: pointer;
-  font-size: 14px;
-  padding: 0 4px;
-  transition: transform 0.2s;
+  font-size: 12px;
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.btn-collapse:hover {
+  background: #e2e8f0;
+  color: #0f172a;
 }
 .top-panel.collapsed .btn-collapse {
   transform: rotate(-90deg);
@@ -76,9 +99,9 @@ body {
 /* ---------- 引用预览条 ---------- */
 .quote-bar {
   flex: 0 0 auto;
-  background: linear-gradient(135deg, #eff6ff, #ede9fe);
-  border-bottom: 1px solid #c7d2fe;
-  padding: 8px 10px;
+  background: #f8fafc;
+  border-bottom: 1px solid #e2e8f0;
+  padding: 12px 14px;
   max-height: 40%;
   overflow-y: auto;
 }
@@ -89,55 +112,64 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 4px;
+  margin-bottom: 8px;
 }
 .quote-label {
   font-weight: 600;
-  color: #4338ca;
+  color: #334155;
   font-size: 12px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
 .quote-actions button {
-  margin-left: 4px;
-  border: 1px solid #c7d2fe;
-  background: #fff;
-  color: #4338ca;
-  border-radius: 4px;
-  padding: 2px 8px;
+  margin-left: 6px;
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
+  color: #475569;
+  border-radius: 6px;
+  padding: 4px 10px;
   font-size: 11px;
+  font-weight: 500;
   cursor: pointer;
+  transition: all 0.15s;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.02);
 }
 .quote-actions button:hover {
-  background: #e0e7ff;
+  background: #f1f5f9;
+  color: #0f172a;
+  border-color: #cbd5e1;
 }
 .quote-text {
   white-space: pre-wrap;
   word-break: break-word;
-  background: #fff;
-  border-radius: 4px;
-  padding: 6px 8px;
-  border: 1px solid #e5e7eb;
+  background: #ffffff;
+  border-radius: 8px;
+  padding: 10px 12px;
+  border: 1px solid #e2e8f0;
   max-height: 120px;
   overflow-y: auto;
-  color: #374151;
+  color: #334155;
   line-height: 1.5;
   outline: none;
   cursor: text;
+  box-shadow: inset 0 1px 3px rgba(0,0,0,0.02);
+  transition: border-color 0.2s, box-shadow 0.2s;
 }
 /* 可编辑引用：聚焦时高亮边框，提示可修改 */
 .quote-text:focus {
-  border-color: #6366f1;
-  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.15);
-  background: #fff;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
 }
 .quote-text:empty::before {
   content: attr(data-placeholder);
-  color: #9ca3af;
+  color: #94a3b8;
   pointer-events: none;
 }
 .quote-source {
   font-size: 10px;
-  color: #6b7280;
-  margin-top: 4px;
+  color: #94a3b8;
+  margin-top: 6px;
   word-break: break-all;
 }
 
@@ -145,45 +177,70 @@ body {
 .site-tabs {
   flex: 0 0 auto;
   display: flex;
-  gap: 4px;
-  padding: 6px;
-  background: #fff;
-  border-bottom: 1px solid #e5e7eb;
+  gap: 8px;
+  padding: 10px 14px;
+  background: #ffffff;
+  border-bottom: 1px solid #e2e8f0;
   overflow-x: auto;
+  /* Allow scrolling */
   scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 transparent;
+}
+.site-tabs::-webkit-scrollbar {
+  height: 4px; /* Thin scrollbar for Chrome/Safari */
+}
+.site-tabs::-webkit-scrollbar-track {
+  background: transparent;
+}
+.site-tabs::-webkit-scrollbar-thumb {
+  background-color: #cbd5e1;
+  border-radius: 2px;
 }
 .site-tab {
   flex: 0 0 auto;
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  padding: 5px 10px;
-  border-radius: 16px;
-  border: 1px solid #e5e7eb;
-  background: #f9fafb;
-  color: #4b5563;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: 20px;
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
+  color: #475569;
   cursor: pointer;
   font-size: 12px;
+  font-weight: 500;
   white-space: nowrap;
-  transition: all 0.15s;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 1px 2px rgba(0,0,0,0.02);
 }
 .site-tab:hover {
-  background: #f3f4f6;
+  background: #f8fafc;
+  border-color: #cbd5e1;
+  color: #0f172a;
 }
 .site-tab.active {
-  background: #2563eb;
-  border-color: #2563eb;
-  color: #fff;
+  background: #0f172a;
+  border-color: #0f172a;
+  color: #ffffff;
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.2);
 }
 .site-tab .ico {
-  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.site-icon-img {
+  width: 14px;
+  height: 14px;
+  border-radius: 2px;
+  object-fit: contain;
 }
 
 /* ---------- iframe ---------- */
 .iframe-wrap {
   flex: 1 1 auto;
   position: relative;
-  background: #fff;
+  background: #ffffff;
 }
 #ai-frame {
   width: 100%;
@@ -194,7 +251,8 @@ body {
 .frame-overlay {
   position: absolute;
   inset: 0;
-  background: rgba(255, 255, 255, 0.85);
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(4px);
   display: flex;
   align-items: center;
   justify-content: center;

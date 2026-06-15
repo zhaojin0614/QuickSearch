@@ -8,15 +8,15 @@
  */
 
 // ===== 默认站点（与 sidepanel.js 一致；供 service worker 单独使用）=====
-const DEFAULT_SITES = [
-  { id: 'chatgpt', name: 'ChatGPT', url: 'https://chatgpt.com/', icon: '🤖' },
-  { id: 'claude', name: 'Claude', url: 'https://claude.ai/new', icon: '🦙' },
-  { id: 'gemini', name: 'Gemini', url: 'https://gemini.google.com/app', icon: '✦' },
-  { id: 'deepseek', name: 'DeepSeek', url: 'https://chat.deepseek.com/', icon: '🐳' },
-  { id: 'tongyi', name: '通义千问', url: 'https://tongyi.aliyun.com/qianwen/', icon: '🧠' },
-  { id: 'kimi', name: 'Kimi', url: 'https://kimi.moonshot.cn/', icon: '🌙' },
-  { id: 'glm', name: '智谱清言', url: 'https://chatglm.cn/main/alltoolsdetail', icon: '🟢' },
-  { id: 'yiyan', name: '文心一言', url: 'https://yiyan.baidu.com/', icon: '🍃' }
+const AISA_DEFAULT_SITES = [
+  { id: 'chatgpt', name: 'ChatGPT', url: 'https://chatgpt.com/', icon: 'assets/site-icons/chatgpt.png' },
+  { id: 'claude', name: 'Claude', url: 'https://claude.ai/new', icon: 'assets/site-icons/claude.png' },
+  { id: 'gemini', name: 'Gemini', url: 'https://gemini.google.com/app', icon: 'assets/site-icons/gemini.png' },
+  { id: 'deepseek', name: 'DeepSeek', url: 'https://chat.deepseek.com/', icon: 'assets/site-icons/deepseek.png' },
+  { id: 'tongyi', name: '通义千问', url: 'https://tongyi.aliyun.com/qianwen/', icon: 'assets/site-icons/tongyi.png' },
+  { id: 'kimi', name: 'Kimi', url: 'https://kimi.moonshot.cn/', icon: 'assets/site-icons/kimi.png' },
+  { id: 'glm', name: '智谱清言', url: 'https://chatglm.cn/main/alltoolsdetail', icon: 'assets/site-icons/glm.png' },
+  { id: 'yiyan', name: '文心一言', url: 'https://yiyan.baidu.com/', icon: 'assets/site-icons/yiyan.png' }
 ];
 
 const SETTINGS_KEY = 'aisa_settings';
@@ -92,6 +92,9 @@ async function setupTabPanel(tabId) {
 }
 
 chrome.runtime.onInstalled.addListener(async () => {
+  // 强制清理旧版本 emoji 图标的站点缓存
+  chrome.storage.local.remove('aisa_sites');
+
   if (chrome.sidePanel && chrome.sidePanel.setPanelBehavior) {
     try {
       await chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true });
@@ -259,6 +262,12 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     chrome.storage.local.set({
       aisa_last_quote: { text: msg.text, source: msg.source || '', time: Date.now() }
     });
+    
+    // 自动打开侧边栏（如果尚未打开）
+    const windowId = sender.tab ? sender.tab.windowId : undefined;
+    const tabId = sender.tab ? sender.tab.id : undefined;
+    openSidePanel(windowId, tabId);
+    
     sendResponse({ ok: true });
   } else if (msg && msg.type === 'AISA_OPEN_PANEL_FROM_FLOAT') {
     // 来自页面悬浮启动器：为来源 tab 所在窗口打开侧边栏
@@ -279,6 +288,12 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       if (queue.length > 20) queue.shift(); // 防止无限增长
       chrome.storage.local.set({ aisa_pending_compose: queue });
     });
+    
+    // 自动打开侧边栏（如果尚未打开）
+    const windowId = sender.tab ? sender.tab.windowId : undefined;
+    const tabId = sender.tab ? sender.tab.id : undefined;
+    openSidePanel(windowId, tabId);
+    
     sendResponse({ ok: true });
   } else if (msg && msg.type === 'AISA_COPY_TAB') {
     // 来自 content/popup 的复制请求
@@ -294,7 +309,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     notify(msg.title || 'AI 侧边栏助手', msg.message || '');
     sendResponse({ ok: true });
   } else if (msg && msg.type === 'AISA_GET_DEFAULT_SITES') {
-    sendResponse({ sites: DEFAULT_SITES });
+    sendResponse({ sites: AISA_DEFAULT_SITES });
     return false;
   } else if (msg && msg.type === 'AISA_OPEN_PANEL') {
     openSidePanel(msg.windowId, msg.tabId)

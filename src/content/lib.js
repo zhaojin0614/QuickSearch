@@ -145,7 +145,7 @@
     launcher.title = 'AI 侧边栏助手（点击打开，可拖动）';
     launcher.innerHTML =
       '<span class="pulse"></span>' +
-      '<span class="ico">🤖</span>' +
+      '<img src="' + chrome.runtime.getURL('assets/icons/icon-32.png') + '" style="width:24px;height:24px;border-radius:6px;vertical-align:middle;box-shadow:0 2px 4px rgba(0,0,0,0.1);">' +
       '<span class="close-x" title="在本页隐藏">×</span>';
     document.documentElement.appendChild(launcher);
 
