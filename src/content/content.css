@@ -91,7 +91,7 @@ html.aisa-supercopy img {
 /* ---------- 页面常驻入口：悬浮启动器 ---------- */
 #aisa-launcher {
   position: fixed;
-  top: 16px;
+  top: 35vh;
   right: 16px;
   z-index: 2147483646;
   width: 44px;
@@ -160,7 +160,7 @@ html.aisa-supercopy img {
 /* 启动器旁边的提示气泡 */
 #aisa-launcher-tip {
   position: fixed;
-  top: 16px;
+  top: calc(35vh + 8px);
   right: 68px;
   z-index: 2147483646;
   background: #1f2937;
