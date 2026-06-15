@@ -41,6 +41,7 @@
     $('opt-superCopy').checked = !!settings.superCopy;
     $('opt-autoCopy').checked = !!settings.autoCopy;
     $('opt-showFloatBtn').checked = !!settings.showFloatBtn;
+    $('opt-showLauncher').checked = settings.showLauncher !== false;
 
     renderSites();
     renderOverrides();
@@ -136,6 +137,7 @@
       superCopy: $('opt-superCopy').checked,
       autoCopy: $('opt-autoCopy').checked,
       showFloatBtn: $('opt-showFloatBtn').checked,
+      showLauncher: $('opt-showLauncher').checked,
       siteOverrides: overrides
     };
 

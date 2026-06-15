@@ -44,6 +44,7 @@ async function init() {
   document.getElementById('set-supercopy').checked = !!currentSettings.superCopy;
   document.getElementById('set-autocopy').checked = !!currentSettings.autoCopy;
   document.getElementById('set-floatbtn').checked = !!currentSettings.showFloatBtn;
+  document.getElementById('set-launcher').checked = currentSettings.showLauncher !== false;
 
   // 当前站点
   const tab = await getCurrentTab();
@@ -78,6 +79,9 @@ document.getElementById('set-autocopy').addEventListener('change', async (e) => 
 });
 document.getElementById('set-floatbtn').addEventListener('change', async (e) => {
   currentSettings = await saveSettings({ showFloatBtn: e.target.checked });
+});
+document.getElementById('set-launcher').addEventListener('change', async (e) => {
+  currentSettings = await saveSettings({ showLauncher: e.target.checked });
 });
 
 // ---------- 站点独立设置（循环：跟随全局 → 强制开 → 强制关 → 跟随全局）----------

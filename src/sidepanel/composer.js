@@ -593,9 +593,27 @@
     } catch (e) { return ''; }
   }
 
-  // 暴露初始化入口
+  // 暴露给外部（sidepanel.js / background 转发的消息）调用的接口
   window.AISA = window.AISA || {};
   window.AISA.initComposer = function () {
     updateStats();
+  };
+  // 外部插入一条引用（如网页浮动按钮"加到组装"）
+  // ref: { label, text, source }
+  window.AISA.addRefToComposer = function (ref) {
+    if (!ref || !ref.text) return false;
+    focusEditorAtEnd();
+    insertChip({
+      kind: ref.kind || 'external',
+      label: ref.label || '引用',
+      text: ref.text,
+      source: ref.source || ''
+    });
+    showToast('已加到提示词组装');
+    return true;
+  };
+  // 当前组装区芯片数量（供折叠条摘要显示）
+  window.AISA.getComposerChipCount = function () {
+    return editor.querySelectorAll('.cmp-chip[data-ref]').length;
   };
 })();

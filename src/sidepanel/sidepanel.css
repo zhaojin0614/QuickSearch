@@ -16,6 +16,63 @@ body {
   overflow: hidden;
 }
 
+/* ---------- 顶部可折叠面板 ---------- */
+.top-panel {
+  flex: 0 0 auto;
+  background: #fff;
+  border-bottom: 1px solid #e5e7eb;
+}
+.top-toggle {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 12px;
+  background: linear-gradient(135deg, #eef2ff, #ede9fe);
+  cursor: pointer;
+  user-select: none;
+  border-bottom: 1px solid #e5e7eb;
+}
+.top-toggle:hover {
+  background: linear-gradient(135deg, #e0e7ff, #ddd6fe);
+}
+.top-toggle-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: #4338ca;
+}
+.top-toggle-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.top-hint {
+  font-size: 11px;
+  color: #6b7280;
+  max-width: 180px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.btn-collapse {
+  background: transparent;
+  border: none;
+  color: #4338ca;
+  cursor: pointer;
+  font-size: 14px;
+  padding: 0 4px;
+  transition: transform 0.2s;
+}
+.top-panel.collapsed .btn-collapse {
+  transform: rotate(-90deg);
+}
+/* 折叠时隐藏内容区 */
+.top-panel.collapsed .top-body {
+  display: none;
+}
+.top-body {
+  /* 内容区 */
+}
+
 /* ---------- 引用预览条 ---------- */
 .quote-bar {
   flex: 0 0 auto;

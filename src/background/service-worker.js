@@ -26,6 +26,7 @@ const DEFAULT_SETTINGS = {
   autoCopyFormat: 'plain',
   minChars: 1,
   showFloatBtn: true,
+  showLauncher: true,
   copyFormat: 'title-url',
   historyLimit: 100,
   siteOverrides: {}
@@ -69,6 +70,32 @@ function notify(title, message) {
 }
 
 // ===== 启动时设置：点击图标打开侧边栏 =====
+// 为每个标签页配置独立的 sidePanel 实例（setOptions 带 tabId），
+// 这样切标签时 Chrome 自动切换实例，各自的 AI 网页状态独立保留、不重载。
+const PANEL_PATH = 'src/sidepanel/sidepanel.html';
+
+async function setupTabPanel(tabId) {
+  if (!chrome.sidePanel || !chrome.sidePanel.setOptions) return;
+  try {
+    await chrome.sidePanel.setOptions({
+      tabId: tabId,
+      path: PANEL_PATH,
+      enabled: true
+    });
+  } catch (e) {
+    // 某些标签（如 chrome:// 内部页）可能不支持，忽略
+  }
+}
+
+async function setupAllTabsPanel() {
+  try {
+    const tabs = await chrome.tabs.query({});
+    for (const t of tabs) {
+      if (t.id && t.id > 0) await setupTabPanel(t.id);
+    }
+  } catch (e) {}
+}
+
 chrome.runtime.onInstalled.addListener(async () => {
   if (chrome.sidePanel && chrome.sidePanel.setPanelBehavior) {
     try {
@@ -77,11 +104,32 @@ chrome.runtime.onInstalled.addListener(async () => {
       // 某些版本不支持，忽略
     }
   }
+  // 全局默认 panel（兜底，未配置 tabId 的标签用这个）
+  if (chrome.sidePanel && chrome.sidePanel.setOptions) {
+    try {
+      await chrome.sidePanel.setOptions({ path: PANEL_PATH, enabled: true });
+    } catch (e) {}
+  }
+  // 为所有现有标签配置独立实例
+  await setupAllTabsPanel();
   createContextMenu();
 });
 
-chrome.runtime.onStartup.addListener(() => {
+chrome.runtime.onStartup.addListener(async () => {
+  await setupAllTabsPanel();
   createContextMenu();
+});
+
+// 新标签创建时配置独立 sidePanel 实例
+chrome.tabs.onCreated.addListener((tab) => {
+  if (tab.id && tab.id > 0) setupTabPanel(tab.id);
+});
+
+// 标签导航到新页面时，重新配置（保证 sidePanel 在该 tab 可用）
+chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+  if (changeInfo.status === 'complete' && tabId > 0) {
+    setupTabPanel(tabId);
+  }
 });
 
 // ===== 右键菜单 =====
@@ -174,6 +222,25 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     // 同时持久化，sidepanel 打开后可恢复
     chrome.storage.local.set({
       aisa_last_quote: { text: msg.text, source: msg.source || '', time: Date.now() }
+    });
+    sendResponse({ ok: true });
+  } else if (msg && msg.type === 'AISA_OPEN_PANEL_FROM_FLOAT') {
+    // 来自页面悬浮启动器：为来源 tab 所在窗口打开侧边栏
+    const windowId = sender.tab ? sender.tab.windowId : undefined;
+    openSidePanel(windowId)
+      .then(() => sendResponse({ ok: true }))
+      .catch(() => sendResponse({ ok: false }));
+    return true;
+  } else if (msg && msg.type === 'AISA_ADD_TO_COMPOSER') {
+    // 来自网页浮动按钮"加到组装"：
+    //  - sidepanel 若已打开，会通过 sendMessage 广播直接收到并插入
+    //  - 这里做持久化兜底：sidepanel 未打开时暂存队列，打开后补插
+    const item = { label: '网页选中', text: msg.text || '', source: msg.source || '', time: Date.now() };
+    chrome.storage.local.get('aisa_pending_compose', (data) => {
+      const queue = Array.isArray(data.aisa_pending_compose) ? data.aisa_pending_compose : [];
+      queue.push(item);
+      if (queue.length > 20) queue.shift(); // 防止无限增长
+      chrome.storage.local.set({ aisa_pending_compose: queue });
     });
     sendResponse({ ok: true });
   } else if (msg && msg.type === 'AISA_COPY_TAB') {

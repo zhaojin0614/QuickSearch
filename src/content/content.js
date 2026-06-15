@@ -27,6 +27,7 @@
       const s = await storage.getEffectiveSettings(hostname());
       currentSettings = s;
       applySuperCopy();
+      applyLauncher();
     } catch (e) {
       // context invalidated 等异常，静默放弃
     }
@@ -36,6 +37,14 @@
     if (!currentSettings) return;
     if (currentSettings.superCopy) api.enableSuperCopy();
     else api.disableSuperCopy();
+  }
+
+  function applyLauncher() {
+    if (!currentSettings) return;
+    // showLauncher 默认 true（未定义时也显示）
+    const show = currentSettings.showLauncher !== false;
+    if (show) api.showLauncher();
+    else api.hideLauncher();
   }
 
   // ---------- 选区监听 ----------

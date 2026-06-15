@@ -7,40 +7,56 @@
   <link rel="stylesheet" href="sidepanel.css" />
 </head>
 <body>
-  <!-- 引用预览条：当选中文字后会显示在这里 -->
-  <div id="quote-bar" class="quote-bar hidden">
-    <div class="quote-head">
-      <span class="quote-label">📌 已选中的引用</span>
-      <span class="quote-actions">
-        <button id="quote-copy" title="复制引用到剪贴板">复制</button>
-        <button id="quote-insert" title="复制并提示你到输入框按 Ctrl+V">复制并粘贴提示</button>
-        <button id="quote-clear" title="清除引用">×</button>
+  <!-- 顶部可折叠面板：引用 + 提示词组装 -->
+  <div id="top-panel" class="top-panel">
+    <!-- 折叠条（始终可见，点击切换展开/折叠） -->
+    <div id="top-toggle" class="top-toggle" title="点击折叠/展开">
+      <span class="top-toggle-title">
+        <span id="top-summary">引用与组装</span>
+      </span>
+      <span class="top-toggle-right">
+        <span id="top-hint" class="top-hint"></span>
+        <button id="btn-collapse" class="btn-collapse" title="折叠">▾</button>
       </span>
     </div>
-    <div id="quote-text" class="quote-text" contenteditable="true" data-placeholder="（可直接编辑这段引用，+引用 / @ 会取这里的内容）"></div>
-    <div id="quote-source" class="quote-source"></div>
-  </div>
+    <!-- 折叠内容区 -->
+    <div id="top-body" class="top-body">
+      <!-- 引用预览条：当选中文字后会显示在这里 -->
+      <div id="quote-bar" class="quote-bar hidden">
+        <div class="quote-head">
+          <span class="quote-label">📌 已选中的引用</span>
+          <span class="quote-actions">
+            <button id="quote-copy" title="复制引用到剪贴板">复制</button>
+            <button id="quote-insert" title="复制并提示你到输入框按 Ctrl+V">复制并粘贴提示</button>
+            <button id="quote-clear" title="清除引用">×</button>
+          </span>
+        </div>
+        <div id="quote-text" class="quote-text" contenteditable="true" data-placeholder="（可直接编辑这段引用，+引用 / @ 会取这里的内容）"></div>
+        <div id="quote-source" class="quote-source"></div>
+      </div>
 
-  <!-- 提示词组装区：@ 引用 -->
-  <div class="composer">
-    <div class="composer-head">
-      <span class="composer-label">💬 提示词组装 <span class="composer-tip">输入 @ 引用内容</span></span>
-      <span class="composer-actions">
-        <button id="cmp-add-quote" title="引用顶部已选中的引用（可在上方编辑）">＋引用</button>
-        <button id="cmp-add-selection" title="快速引用当前选中">＋选中</button>
-        <button id="cmp-add-page" title="快速引用当前页面正文">＋页面</button>
-        <button id="cmp-clear" title="清空">清空</button>
-      </span>
+      <!-- 提示词组装区：@ 引用 -->
+      <div class="composer">
+        <div class="composer-head">
+          <span class="composer-label">💬 提示词组装 <span class="composer-tip">输入 @ 引用内容</span></span>
+          <span class="composer-actions">
+            <button id="cmp-add-quote" title="引用顶部已选中的引用（可在上方编辑）">＋引用</button>
+            <button id="cmp-add-selection" title="快速引用当前选中">＋选中</button>
+            <button id="cmp-add-page" title="快速引用当前页面正文">＋页面</button>
+            <button id="cmp-clear" title="清空">清空</button>
+          </span>
+        </div>
+        <div class="editor-wrap">
+          <div id="cmp-editor" class="cmp-editor" contenteditable="true" data-placeholder="帮我总结 @ ...&#10;用 @ 引用：选中文字 / 页面正文 / 其他标签页"></div>
+        </div>
+        <div class="composer-foot">
+          <span id="cmp-stats" class="cmp-stats">0 字</span>
+          <button id="cmp-copy" class="cmp-copy primary">📋 组装并复制</button>
+        </div>
+        <!-- @ 候选菜单 -->
+        <div id="at-menu" class="at-menu hidden"></div>
+      </div>
     </div>
-    <div class="editor-wrap">
-      <div id="cmp-editor" class="cmp-editor" contenteditable="true" data-placeholder="帮我总结 @ ...&#10;用 @ 引用：选中文字 / 页面正文 / 其他标签页"></div>
-    </div>
-    <div class="composer-foot">
-      <span id="cmp-stats" class="cmp-stats">0 字</span>
-      <button id="cmp-copy" class="cmp-copy primary">📋 组装并复制</button>
-    </div>
-    <!-- @ 候选菜单 -->
-    <div id="at-menu" class="at-menu hidden"></div>
   </div>
 
   <!-- AI 站点 tab 切换栏 -->

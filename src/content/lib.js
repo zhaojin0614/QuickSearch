@@ -28,27 +28,36 @@
     toastTimer = setTimeout(() => toastEl.classList.add('hidden'), duration || 2000);
   }
 
-  // ==================== 浮动按钮 ====================
+  // ==================== 浮动按钮（选中后出现）====================
   let floatBtn = null;
   function ensureFloatBtn() {
     if (floatBtn) return floatBtn;
-    floatBtn = document.createElement('button');
-    floatBtn.id = 'aisa-float-btn';
+    floatBtn = document.createElement('div');
+    floatBtn.id = 'aisa-float-bar';
     floatBtn.className = 'hidden';
-    floatBtn.innerHTML = '📌 发到侧边栏';
+    floatBtn.innerHTML =
+      '<button class="aisa-fb-btn" data-act="quote">📌 发到侧边栏</button>' +
+      '<button class="aisa-fb-btn alt" data-act="compose">➕ 加到组装</button>';
     floatBtn.addEventListener('mousedown', (e) => {
       // 阻止按钮点击导致选区丢失
       e.preventDefault();
     });
-    floatBtn.addEventListener('click', (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      const text = currentSelectionText();
-      if (text) {
-        sendQuote(text);
-        toast('已发送到侧边栏（同时已复制，可按 Ctrl+V 粘贴）', 3000);
-      }
-      hideFloatBtn();
+    floatBtn.querySelectorAll('.aisa-fb-btn').forEach((b) => {
+      b.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const text = currentSelectionText();
+        if (!text) { hideFloatBtn(); return; }
+        const act = b.getAttribute('data-act');
+        if (act === 'quote') {
+          sendQuote(text);
+          toast('已发送到侧边栏（同时已复制，可按 Ctrl+V 粘贴）', 3000);
+        } else if (act === 'compose') {
+          safeSendMessage({ type: 'AISA_ADD_TO_COMPOSER', text: text, source: document.title || '' });
+          toast('已加到提示词组装', 2000);
+        }
+        hideFloatBtn();
+      });
     });
     document.documentElement.appendChild(floatBtn);
     return floatBtn;
@@ -57,7 +66,7 @@
   function showFloatBtnAt(rect) {
     const btn = ensureFloatBtn();
     const top = window.scrollY + (rect.top != null ? rect.top : 0) - 36;
-    const left = window.scrollX + (rect.left != null ? rect.left : 0) + (rect.width || 0) / 2 - 60;
+    const left = window.scrollX + (rect.left != null ? rect.left : 0) + (rect.width || 0) / 2 - 90;
     btn.style.top = Math.max(8, top) + 'px';
     btn.style.left = Math.max(8, left) + 'px';
     btn.classList.remove('hidden');
@@ -122,6 +131,137 @@
       text: text,
       source: src
     });
+  }
+
+  // ==================== 页面常驻悬浮启动器 ====================
+  let launcher = null;
+  let launcherTip = null;
+  let launcherHidden = false; // 用户点了×临时隐藏当前页
+
+  function ensureLauncher() {
+    if (launcher) return launcher;
+    launcher = document.createElement('div');
+    launcher.id = 'aisa-launcher';
+    launcher.title = 'AI 侧边栏助手（点击打开，可拖动）';
+    launcher.innerHTML =
+      '<span class="pulse"></span>' +
+      '<span class="ico">🤖</span>' +
+      '<span class="close-x" title="在本页隐藏">×</span>';
+    document.documentElement.appendChild(launcher);
+
+    // 提示气泡（首次出现时显示几秒）
+    launcherTip = document.createElement('div');
+    launcherTip.id = 'aisa-launcher-tip';
+    launcherTip.textContent = '点我打开 AI 侧边栏 →';
+    document.documentElement.appendChild(launcherTip);
+
+    bindLauncherEvents(launcher);
+    // 首次出现：3 秒后淡出脉冲提示
+    setTimeout(() => {
+      const pulse = launcher.querySelector('.pulse');
+      if (pulse) pulse.style.display = 'none';
+      showLauncherTip(true);
+      setTimeout(() => showLauncherTip(false), 4000);
+    }, 3000);
+    return launcher;
+  }
+
+  function showLauncherTip(show) {
+    if (!launcherTip) return;
+    if (show && launcher && !launcher.classList.contains('hidden')) {
+      // 与 launcher 同高对齐
+      launcherTip.classList.remove('hidden');
+      // 触发重排再加 show 以启用 transition
+      void launcherTip.offsetWidth;
+      launcherTip.classList.add('show');
+    } else {
+      launcherTip.classList.remove('show');
+    }
+  }
+
+  function showLauncher() {
+    if (launcherHidden) return; // 用户在本页隐藏了
+    ensureLauncher();
+    launcher.classList.remove('hidden');
+  }
+  function hideLauncher() {
+    if (launcher) launcher.classList.add('hidden');
+    if (launcherTip) launcherTip.classList.add('hidden');
+  }
+
+  function bindLauncherEvents(el) {
+    let dragging = false;
+    let moved = false;
+    let startX = 0, startY = 0;
+    let offsetX = 0, offsetY = 0;
+    let size = 44;
+
+    el.addEventListener('mousedown', (e) => {
+      // 点的是关闭按钮，交给它自己处理
+      if (e.target.classList.contains('close-x')) return;
+      dragging = true;
+      moved = false;
+      startX = e.clientX;
+      startY = e.clientY;
+      const rect = el.getBoundingClientRect();
+      offsetX = e.clientX - rect.left;
+      offsetY = e.clientY - rect.top;
+      e.preventDefault();
+    });
+
+    document.addEventListener('mousemove', (e) => {
+      if (!dragging) return;
+      const dx = e.clientX - startX;
+      const dy = e.clientY - startY;
+      if (!moved && Math.abs(dx) + Math.abs(dy) > 4) {
+        moved = true;
+        el.classList.add('dragging');
+      }
+      if (moved) {
+        // 改用 left/top 定位（脱离初始 right）
+        let x = e.clientX - offsetX;
+        let y = e.clientY - offsetY;
+        // 限制在视口内
+        x = Math.max(4, Math.min(window.innerWidth - size - 4, x));
+        y = Math.max(4, Math.min(window.innerHeight - size - 4, y));
+        el.style.left = x + 'px';
+        el.style.top = y + 'px';
+        el.style.right = 'auto';
+        // 提示气泡跟随
+        if (launcherTip) {
+          launcherTip.style.left = 'auto';
+          launcherTip.style.right = 'auto';
+          launcherTip.style.top = y + 'px';
+          launcherTip.style.left = (x - 140) + 'px';
+        }
+      }
+    });
+
+    document.addEventListener('mouseup', () => {
+      if (!dragging) return;
+      dragging = false;
+      el.classList.remove('dragging');
+      // 没移动才算点击
+      if (!moved) {
+        openSidePanelFromContent();
+      }
+      setTimeout(() => { moved = false; }, 0);
+    });
+
+    // 关闭按钮：隐藏当前页启动器（仅本页）
+    el.querySelector('.close-x').addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      launcherHidden = true;
+      hideLauncher();
+      toast('已在本页隐藏，刷新页面恢复', 2000);
+    });
+  }
+
+  function openSidePanelFromContent() {
+    // content script 无法直接开侧边栏，通知 background 处理
+    safeSendMessage({ type: 'AISA_OPEN_PANEL_FROM_FLOAT' });
+    toast('正在打开 AI 侧边栏…', 1500);
   }
 
   // ==================== 超级复制破解 ====================
@@ -219,6 +359,8 @@
     disableSuperCopy,
     autoCopySelection,
     runtimeAlive,
-    safeSendMessage
+    safeSendMessage,
+    showLauncher,
+    hideLauncher
   };
 })();
