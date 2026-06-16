@@ -295,6 +295,11 @@
     // 通知 service worker：当前 tab 已打开侧边栏（用于跨标签页状态跟踪）
     if (currentTabId) {
       chrome.runtime.sendMessage({ type: 'AISA_PANEL_OPENED', tabId: currentTabId }).catch(() => {});
+      try {
+        chrome.runtime.connect({ name: 'aisa-sidepanel-' + currentTabId });
+      } catch (e) {
+        console.error('Failed to connect port:', e);
+      }
     }
 
     // 恢复站点（按 tab → window → global 兜底）。

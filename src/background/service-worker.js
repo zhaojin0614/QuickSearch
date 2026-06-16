@@ -124,21 +124,72 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   }
 });
 
-// ===== 核心修复：防止 Chrome 自动将侧边栏状态克隆到新标签页 =====
+// ===== 核心修复：防止侧边栏状态泄漏到未打开侧边栏的标签页 =====
+
+// 跟踪哪些 tab 主动打开过侧边栏（用户点击图标 / 右键菜单 / 引用发送等）
+const panelOpenTabs = new Set();
+
+// 监听来自 sidepanel 的长连接，用于感知侧边栏的关闭
+chrome.runtime.onConnect.addListener((port) => {
+  if (port.name && port.name.startsWith('aisa-sidepanel-')) {
+    const tabId = parseInt(port.name.split('-')[2], 10);
+    if (tabId && tabId > 0) {
+      panelOpenTabs.add(tabId);
+      
+      port.onDisconnect.addListener(async () => {
+        try {
+          const tab = await chrome.tabs.get(tabId);
+          if (tab && tab.active) {
+            panelOpenTabs.delete(tabId);
+          }
+        } catch (e) {
+          // tab已关闭或不存在
+          panelOpenTabs.delete(tabId);
+        }
+      });
+    }
+  }
+});
+
+// 新建标签页时，强制禁用侧边栏（覆盖 Chrome 的默认克隆行为）。
+// 不设定时器重新启用！由 onUpdated(status=complete) → setupTabPanel() 在页面加载完后重新启用。
+// 原因：对后台标签页 disable 不会改变窗口级别的"panel open"状态，
+// 如果在用户切换过来之前就 re-enable，Chrome 会根据窗口状态重新显示侧边栏。
 chrome.tabs.onCreated.addListener((tab) => {
   if (tab.id && tab.id > 0) {
     if (!chrome.sidePanel || !chrome.sidePanel.setOptions) return;
-    // 新建标签页时，先强制关闭侧边栏（覆盖 Chrome 的默认克隆行为）
-    chrome.sidePanel.setOptions({ tabId: tab.id, enabled: false }).then(() => {
-      // 延迟 300ms 后恢复可点击状态（此时它处于关闭状态，但用户可以点击图标打开）
+    chrome.sidePanel.setOptions({ tabId: tab.id, enabled: false }).catch(() => {});
+  }
+});
+
+// 切换标签页时：如果目标 tab 没有主动打开过侧边栏，则关闭侧边栏
+chrome.tabs.onActivated.addListener((activeInfo) => {
+  const tabId = activeInfo.tabId;
+  if (!tabId || tabId <= 0) return;
+  if (!chrome.sidePanel || !chrome.sidePanel.setOptions) return;
+
+  if (!panelOpenTabs.has(tabId)) {
+    // 目标 tab 没有打开过侧边栏 → 先 disable 强制关闭，再恢复 enable（可点击图标打开）。
+    // 由于是当前活跃标签页，disable 会将窗口级别状态改为"closed"，
+    // 因此后续 re-enable 不会导致侧边栏重新出现（窗口状态已经是"closed"）。
+    chrome.sidePanel.setOptions({ tabId, enabled: false }).then(() => {
       setTimeout(() => {
-        chrome.sidePanel.setOptions({ tabId: tab.id, path: PANEL_PATH, enabled: true }).catch(() => {});
-      }, 300);
+        chrome.sidePanel.setOptions({ tabId, path: PANEL_PATH, enabled: true }).catch(() => {});
+      }, 50);
     }).catch(() => {});
   }
 });
 
+// 标签页关闭时清理跟踪记录
+chrome.tabs.onRemoved.addListener((tabId) => {
+  panelOpenTabs.delete(tabId);
+});
+
 async function openSidePanel(windowId, tabId) {
+  // 记录该 tab 主动打开了侧边栏
+  if (tabId && tabId > 0) {
+    panelOpenTabs.add(tabId);
+  }
   if (chrome.sidePanel && chrome.sidePanel.open) {
     try {
       if (windowId != null) {
@@ -222,6 +273,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     // 侧边栏页面加载时通知：标记当前活动标签已打开侧边栏
     const tabId = msg.tabId;
     if (tabId && tabId > 0) {
+      panelOpenTabs.add(tabId);
       // 确保该 tab 的 panel 是启用的
       if (chrome.sidePanel && chrome.sidePanel.setOptions) {
         chrome.sidePanel.setOptions({ tabId, path: PANEL_PATH, enabled: true }).catch(() => {});
