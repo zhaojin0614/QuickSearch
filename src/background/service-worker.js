@@ -2,7 +2,7 @@
  * 后台 service worker：
  *  - 点击 action 图标打开/聚焦侧边栏
  *  - content → sidepanel 的引用消息转发
- *  - 快捷键命令（Alt+1/2/3/4）
+ *  - 快捷键命令（Alt+Q 开侧栏 / Alt+1/3/4）
  *  - 右键菜单（复制标签页、超级复制切换等）
  *  - 通知
  */
@@ -70,12 +70,13 @@ function notify(title, message) {
 }
 
 // ===== 启动时设置：点击图标打开侧边栏 =====
-// 策略：全局 enabled: false → 新标签页绝对不会出现侧边栏（从根源杜绝）。
-// openPanelOnActionClick: true → 已 enabled 的标签页点图标直接开；
-//   未 enabled 的标签页 Chrome 会触发 action.onClicked 兜底 → 手动 enable + open。
+// 策略：全局 enabled: false（防泄漏）+ per-tab enabled（按需开启）+ open({tabId})（per-tab 打开）。
+// 关键：open({tabId}) 只在该 tab 打开侧边栏，切到其他 tab 自动消失，不共享、不泄漏。
+// 时序铁律：setOptions 与 open 必须在手势回调里【同步连续】调用，绝不能 await，
+//          否则用户手势上下文丢失 → 面板打不开（即所谓“点两下”）。
 const PANEL_PATH = 'src/sidepanel/sidepanel.html';
 
-chrome.runtime.onInstalled.addListener(async () => {
+chrome.runtime.onInstalled.addListener(async (details) => {
   chrome.storage.local.remove('aisa_sites');
 
   if (chrome.sidePanel && chrome.sidePanel.setPanelBehavior) {
@@ -83,12 +84,18 @@ chrome.runtime.onInstalled.addListener(async () => {
       await chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true });
     } catch (e) {}
   }
+  // 全局 enabled: false：新标签页不会自动带出侧边栏（防泄漏）
   if (chrome.sidePanel && chrome.sidePanel.setOptions) {
     try {
       await chrome.sidePanel.setOptions({ path: PANEL_PATH, enabled: false });
     } catch (e) {}
   }
   createContextMenu();
+
+  // 首次安装或更新后，打开使用指引页（说明固定扩展、快捷键等）
+  if (details && (details.reason === 'install' || details.reason === 'update')) {
+    chrome.tabs.create({ url: chrome.runtime.getURL('src/onboarding/onboarding.html') });
+  }
 });
 
 chrome.runtime.onStartup.addListener(async () => {
@@ -105,97 +112,56 @@ chrome.runtime.onStartup.addListener(async () => {
   createContextMenu();
 });
 
-// 页面加载完成：只对已打开过侧边栏的标签页保持 enabled
-chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
-  if (changeInfo.status === 'complete' && tabId > 0) {
-    pendingTabs.delete(tabId);
-    if (panelOpenTabs.has(tabId) && chrome.sidePanel && chrome.sidePanel.setOptions) {
-      chrome.sidePanel.setOptions({ tabId, path: PANEL_PATH, enabled: true }).catch(() => {});
-    }
-  }
+// 跟踪哪些 tab 主动打开过侧边栏（用于切回该 tab 时恢复 enabled）
+const panelOpenTabs = new Set();
+
+chrome.tabs.onRemoved.addListener((tabId) => {
+  panelOpenTabs.delete(tabId);
 });
 
-// ===== 侧边栏按标签页独立管理 =====
-
-const panelOpenTabs = new Set();
-const pendingTabs = new Set();
-
-// 监听 sidepanel 长连接（感知侧边栏关闭）
+// 监听 sidepanel 长连接：记录哪个 tab 打开了侧边栏
 chrome.runtime.onConnect.addListener((port) => {
   if (port.name && port.name.startsWith('aisa-sidepanel-')) {
     const tabId = parseInt(port.name.split('-')[2], 10);
     if (tabId && tabId > 0) {
       panelOpenTabs.add(tabId);
-      if (chrome.sidePanel && chrome.sidePanel.setOptions) {
-        chrome.sidePanel.setOptions({ tabId, path: PANEL_PATH, enabled: true }).catch(() => {});
-      }
-      
-      port.onDisconnect.addListener(async () => {
-        try {
-          const tab = await chrome.tabs.get(tabId);
-          if (tab && tab.active) {
-            panelOpenTabs.delete(tabId);
-            if (chrome.sidePanel && chrome.sidePanel.setOptions) {
-              chrome.sidePanel.setOptions({ tabId, enabled: false }).catch(() => {});
-            }
-          }
-        } catch (e) {
-          panelOpenTabs.delete(tabId);
-        }
+      port.onDisconnect.addListener(() => {
+        panelOpenTabs.delete(tabId);
       });
     }
   }
 });
 
-// 新建标签页：显式 per-tab disabled（双重保障，配合全局 disabled）
-chrome.tabs.onCreated.addListener((tab) => {
-  if (tab.id && tab.id > 0) {
-    pendingTabs.add(tab.id);
-    if (chrome.sidePanel && chrome.sidePanel.setOptions) {
-      chrome.sidePanel.setOptions({ tabId: tab.id, enabled: false }).catch(() => {});
-    }
-  }
-});
+// 为指定 tab 打开侧边栏。
+// 注意：setOptions 与 open 必须【同步连续】调用，不可 await（否则手势丢失）。
+// 来自消息回调（引用/组装等）的调用本身可能无手势，open() 可能失败，属预期行为。
+function openSidePanelForTab(tabId) {
+  if (!chrome.sidePanel || !tabId || tabId <= 0) return;
+  panelOpenTabs.add(tabId);
+  // 同步：先给该 tab enable，再 per-tab 打开
+  try {
+    chrome.sidePanel.setOptions({ tabId, path: PANEL_PATH, enabled: true });
+  } catch (e) {}
+  try {
+    chrome.sidePanel.open({ tabId });
+  } catch (e) {}
+}
 
-// 切换标签页
-chrome.tabs.onActivated.addListener((activeInfo) => {
-  const tabId = activeInfo.tabId;
-  if (!tabId || tabId <= 0) return;
-  if (!chrome.sidePanel || !chrome.sidePanel.setOptions) return;
-
-  if (panelOpenTabs.has(tabId)) {
-    // 切回之前打开过侧边栏的标签页 → 确保 enabled
-    chrome.sidePanel.setOptions({ tabId, path: PANEL_PATH, enabled: true }).catch(() => {});
-  }
-});
-
-chrome.tabs.onRemoved.addListener((tabId) => {
-  panelOpenTabs.delete(tabId);
-  pendingTabs.delete(tabId);
-});
-
-async function openSidePanel(windowId, tabId) {
+// 兼容旧调用签名（windowId/tabId）的非手势入口（右键菜单/消息转发等）
+function openSidePanel(windowId, tabId) {
   if (tabId && tabId > 0) {
-    panelOpenTabs.add(tabId);
-    pendingTabs.delete(tabId);
-  }
-  // 先 open()（保留用户手势时效），再 setOptions(enabled: true)。
-  // open() 不要求 tab 是 enabled 的；setOptions 放后面确保切标签时侧边栏能正常显示。
-  if (chrome.sidePanel && chrome.sidePanel.open) {
-    try {
-      await chrome.sidePanel.open(windowId != null ? { windowId } : {});
-    } catch (e) {}
-  }
-  if (tabId && tabId > 0 && chrome.sidePanel && chrome.sidePanel.setOptions) {
-    chrome.sidePanel.setOptions({ tabId, path: PANEL_PATH, enabled: true }).catch(() => {});
+    openSidePanelForTab(tabId);
+  } else if (windowId != null) {
+    if (chrome.sidePanel && chrome.sidePanel.open) {
+      try { chrome.sidePanel.open({ windowId }); } catch (e) {}
+    }
   }
 }
 
-// 点击扩展图标：
-// - 标签页已 enabled → openPanelOnActionClick 直接打开，此回调不触发
-// - 标签页未 enabled → openPanelOnActionClick 无效，Chrome 触发此回调 → 手动 enable + open
-chrome.action.onClicked.addListener(async (tab) => {
-  await openSidePanel(tab.windowId, tab.id);
+// 点击扩展图标 / Alt+Q：
+// 关键——必须同步直调 openSidePanelForTab，绝不能包成 async/await，否则丢失手势。
+chrome.action.onClicked.addListener((tab) => {
+  openSidePanelForTab(tab.id);
 });
 
 // ===== 右键菜单 =====
@@ -263,11 +229,6 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     const tabId = msg.tabId;
     if (tabId && tabId > 0) {
       panelOpenTabs.add(tabId);
-      pendingTabs.delete(tabId);
-      // 确保该 tab 的 panel 是启用的
-      if (chrome.sidePanel && chrome.sidePanel.setOptions) {
-        chrome.sidePanel.setOptions({ tabId, path: PANEL_PATH, enabled: true }).catch(() => {});
-      }
     }
     sendResponse({ ok: true });
   } else if (msg && msg.type === 'AISA_QUOTE') {
@@ -282,16 +243,18 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     const windowId = sender.tab ? sender.tab.windowId : undefined;
     const tabId = sender.tab ? sender.tab.id : undefined;
     openSidePanel(windowId, tabId);
-    
+
     sendResponse({ ok: true });
   } else if (msg && msg.type === 'AISA_OPEN_PANEL_FROM_FLOAT') {
-    // 来自页面悬浮启动器：为来源 tab 所在窗口打开侧边栏
-    const windowId = sender.tab ? sender.tab.windowId : undefined;
+    // 来自页面悬浮启动器：用来源 tab 的 id 走 open({tabId}) per-tab 打开路径。
+    // 这与“发到侧边栏/加到组装”是同一套已被验证可行的机制。
     const tabId = sender.tab ? sender.tab.id : undefined;
-    openSidePanel(windowId, tabId)
-      .then(() => sendResponse({ ok: true }))
-      .catch(() => sendResponse({ ok: false }));
-    return true;
+    if (tabId && tabId > 0) {
+      openSidePanelForTab(tabId);
+      sendResponse({ ok: true });
+    } else {
+      sendResponse({ ok: false });
+    }
   } else if (msg && msg.type === 'AISA_ADD_TO_COMPOSER') {
     // 来自网页浮动按钮"加到组装"：
     //  - sidepanel 若已打开，会通过 sendMessage 广播直接收到并插入
@@ -366,11 +329,6 @@ chrome.commands.onCommand.addListener(async (command) => {
     case 'copy-current-tab': {
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
       if (tab) await copyCurrentTab(tab);
-      break;
-    }
-    case 'copy-all-tabs': {
-      const tabs = await chrome.tabs.query({ currentWindow: true });
-      await copyAllTabs(tabs);
       break;
     }
     case 'toggle-autocopy': {

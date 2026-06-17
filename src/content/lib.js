@@ -259,7 +259,8 @@
   }
 
   function openSidePanelFromContent() {
-    // content script 无法直接开侧边栏，通知 background 处理
+    // content script 无法直接开侧边栏，通知 background 处理。
+    // background 端用 sender.tab.id 走 open({tabId}) 路径打开（与“发到侧边栏”同一机制）。
     safeSendMessage({ type: 'AISA_OPEN_PANEL_FROM_FLOAT' });
     toast('正在打开 AI 侧边栏…', 1500);
   }

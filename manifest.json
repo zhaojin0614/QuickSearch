@@ -53,7 +53,7 @@
   ],
   "web_accessible_resources": [
     {
-      "resources": ["src/content/content.css", "assets/icons/*"],
+      "resources": ["src/content/content.css", "assets/icons/*", "src/onboarding/*"],
       "matches": ["<all_urls>"]
     }
   ],
@@ -71,13 +71,13 @@
     "open_in_tab": true
   },
   "commands": {
+    "_execute_action": {
+      "suggested_key": { "default": "Alt+Q" },
+      "description": "打开/聚焦 AI 侧边栏"
+    },
     "copy-current-tab": {
       "suggested_key": { "default": "Alt+1" },
       "description": "复制当前标签页信息"
-    },
-    "copy-all-tabs": {
-      "suggested_key": { "default": "Alt+2" },
-      "description": "复制所有标签页信息"
     },
     "toggle-autocopy": {
       "suggested_key": { "default": "Alt+3" },
