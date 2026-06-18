@@ -77,7 +77,10 @@ function notify(title, message) {
 const PANEL_PATH = 'src/sidepanel/sidepanel.html';
 
 chrome.runtime.onInstalled.addListener(async (details) => {
-  chrome.storage.local.remove('aisa_sites');
+  // 仅首次安装时重置站点为默认值；更新时保留用户已保存的站点（防止升级丢数据）。
+  if (details && details.reason === 'install') {
+    chrome.storage.local.remove('aisa_sites');
+  }
 
   if (chrome.sidePanel && chrome.sidePanel.setPanelBehavior) {
     try {
