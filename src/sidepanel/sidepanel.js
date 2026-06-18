@@ -104,20 +104,34 @@
     renderTabs();
   }
 
+  // 站点图标 src 归一化：兼容 'assets/..' 、'../../assets/..' 、'http(s)://' 三种格式。
+  // 历史原因 background 默认值用 'assets/..'（无 ../），options/sidepanel 默认值用 '../../assets/..'，
+  // 若 storage 里混存了无 ../ 的格式，直接当相对路径会在 src/sidepanel/ 下解析失败（裂图）。
+  // 统一用 chrome.runtime.getURL 转成 chrome-extension:// 绝对路径，任何上下文都对。
+  function siteIconSrc(icon) {
+    if (!icon) return '';
+    if (/^https?:\/\//.test(icon)) return icon;
+    if (/(?:^|\/)assets\//.test(icon)) {
+      return chrome.runtime.getURL(icon.replace(/^(\.\.\/)+/, ''));
+    }
+    return '';
+  }
+
   function renderTabs() {
     tabsEl.innerHTML = '';
     currentSites.forEach((site) => {
       const btn = document.createElement('button');
       btn.className = 'site-tab';
       btn.dataset.id = site.id;
-      
+
       let iconHtml = '';
-      if (site.icon && site.icon.includes('/')) {
-        iconHtml = `<img src="${site.icon}" class="site-icon-img" alt="${escapeHtml(site.name)}" onerror="this.src='../../assets/icons/icon-16.png'">`;
+      const src = siteIconSrc(site.icon);
+      if (src) {
+        iconHtml = `<img src="${src}" class="site-icon-img" alt="${escapeHtml(site.name)}" onerror="this.src='${chrome.runtime.getURL('assets/icons/icon-16.png')}'">`;
       } else {
-        iconHtml = site.icon || '•';
+        iconHtml = escapeHtml(site.icon || '•');
       }
-      
+
       btn.innerHTML = '<span class="ico">' + iconHtml + '</span><span>' + escapeHtml(site.name) + '</span>';
       btn.addEventListener('click', () => selectSite(site));
       tabsEl.appendChild(btn);

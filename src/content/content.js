@@ -153,5 +153,12 @@
   });
 
   // ---------- 启动 ----------
+  // 暴露当前 settings 给 content 库（悬浮球面板需读取 superCopy 等状态）
+  api.getSettings = () => currentSettings;
+  // 乐观更新本地 settings 缓存：面板里点开关后立即写入，避免异步广播回来前 renderTab 重渲读到旧值
+  // 导致「点了没反应、下次才变」的延迟感。
+  api.updateSettingsCache = (patch) => {
+    currentSettings = Object.assign({}, currentSettings || {}, patch || {});
+  };
   refreshSettings();
 })();

@@ -114,8 +114,12 @@
       const row = document.createElement('div');
       row.className = 'site-row';
       let iconHtml = '';
-      if (s.icon && s.icon.includes('/')) {
-        iconHtml = `<img src="${s.icon}" class="site-icon-img" alt="${escapeHtml(s.name)}" style="width:16px;height:16px;vertical-align:middle;border-radius:2px;object-fit:contain;" onerror="this.src='../../assets/icons/icon-16.png'">`;
+      // 图标路径归一化：兼容 'assets/..'（background 默认值，无 ../）与 '../../assets/..'（本页默认值）。
+      // 统一用 getURL 转绝对路径，避免 storage 里混存格式时相对路径解析失败导致裂图。
+      const iconSrc = s.icon && /^https?:\/\//.test(s.icon) ? s.icon
+        : (s.icon && /(?:^|\/)assets\//.test(s.icon) ? chrome.runtime.getURL(s.icon.replace(/^(\.\.\/)+/, '')) : '');
+      if (iconSrc) {
+        iconHtml = `<img src="${iconSrc}" class="site-icon-img" alt="${escapeHtml(s.name)}" style="width:16px;height:16px;vertical-align:middle;border-radius:2px;object-fit:contain;" onerror="this.src='${chrome.runtime.getURL('assets/icons/icon-16.png')}'">`;
       } else {
         iconHtml = escapeHtml(s.icon || '•');
       }

@@ -53,7 +53,7 @@
   ],
   "web_accessible_resources": [
     {
-      "resources": ["src/content/content.css", "assets/icons/*", "src/onboarding/*"],
+      "resources": ["src/content/content.css", "assets/icons/*", "assets/site-icons/*", "src/onboarding/*"],
       "matches": ["<all_urls>"]
     }
   ],

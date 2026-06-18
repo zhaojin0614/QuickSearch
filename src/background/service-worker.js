@@ -277,6 +277,10 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     // 来自 content/popup 的复制请求
     if (sender.tab) copyCurrentTab(sender.tab).then(() => sendResponse({ ok: true }));
     else sendResponse({ ok: false });
+  } else if (msg && msg.type === 'AISA_OPEN_HISTORY') {
+    // 打开本地剪贴板历史页（用 chrome.tabs.create，避免 window.open 被广告拦截扩展屏蔽）
+    chrome.tabs.create({ url: chrome.runtime.getURL('src/history/history.html') });
+    sendResponse({ ok: true });
   } else if (msg && msg.type === 'AISA_GET_SETTINGS') {
     getSettings().then((s) => sendResponse({ settings: s }));
     return true; // 异步
