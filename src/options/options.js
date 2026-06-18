@@ -196,6 +196,45 @@
     scheduleSave();
   });
 
+  // ---------- 数据备份：导出 / 导入 ----------
+  $('btn-export').addEventListener('click', async () => {
+    try {
+      const payload = await storage.exportAll();
+      const json = JSON.stringify(payload, null, 2);
+      const blob = new Blob([json], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const ts = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `aisa-backup-${ts}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      status('已导出备份文件', false, 2500);
+    } catch (e) {
+      status('导出失败: ' + e.message, true);
+    }
+  });
+
+  $('btn-import').addEventListener('click', () => $('import-file').click());
+
+  $('import-file').addEventListener('change', async (ev) => {
+    const file = ev.target.files && ev.target.files[0];
+    ev.target.value = ''; // 允许重复选同一文件
+    if (!file) return;
+    try {
+      const text = await file.text();
+      const payload = JSON.parse(text);
+      if (!confirm('导入将覆盖当前所有设置、提示词与历史，确定继续？')) return;
+      await storage.importAll(payload);
+      status('导入成功，正在刷新…', false, 1500);
+      setTimeout(() => location.reload(), 1200);
+    } catch (e) {
+      status('导入失败: ' + e.message, true);
+    }
+  });
+
   // ---------- 提示词模板 ----------
   function renderPrompts() {
     const list = $('prompts-list');

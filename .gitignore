@@ -11,3 +11,8 @@ Thumbs.db
 *.log
 .vscode/
 .idea/
+
+# 扩展签名私钥（用于生成稳定 ID 的 manifest key 字段）
+# 切勿提交或泄露：拥有私钥者可冒用本扩展 ID 发布同名扩展。
+# 实际存放位置：D:\code_data\code\golang_secrets\aisa-extension.pem（扩展目录外）
+*.pem
