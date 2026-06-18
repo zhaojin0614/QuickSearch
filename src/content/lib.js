@@ -392,6 +392,34 @@
     else if (activeTab === 'prompts') renderPromptsTab(body);
   }
 
+  // 把当前网页加入 AI 站点列表（用页面标题作为名称、location.href 作为 URL）
+  async function addCurrentPageAsSite() {
+    const storage = window.AISA && window.AISA.storage;
+    if (!storage || !storage.getSites || !storage.saveSites) {
+      toast('存储不可用，添加失败', 2000);
+      return;
+    }
+    const href = location.href;
+    if (!/^https?:/i.test(href)) {
+      toast('当前页面不是网页，无法添加', 2000);
+      return;
+    }
+    let sites = (await storage.getSites()) || [];
+    if (!sites.length) {
+      const r = await safeSendMessage({ type: 'AISA_GET_DEFAULT_SITES' });
+      sites = (r && r.sites) || [];
+    }
+    // 去重：同 URL 已存在则提示
+    if (sites.some((s) => s && s.url === href)) {
+      toast('该页面已在站点列表中', 2000);
+      return;
+    }
+    const name = (document.title || location.hostname || '新站点').slice(0, 20);
+    sites.push({ id: 'custom_' + Date.now(), name: name, url: href, icon: '🔗', pinned: false });
+    await storage.saveSites(storage.sortSites(sites));
+    toast('已添加站点：' + name, 2000);
+  }
+
   // ---------------- 操作 tab ----------------
   function renderActionsTab(body) {
     const selText = currentSelectionText();
@@ -413,6 +441,9 @@
               toast('查询标签页失败', 1500);
             }
           });
+        } },
+      { icon: '➕', label: '添加当前页为 AI 站点', sub: '把本页加入侧边栏站点列表', act: async () => {
+          await addCurrentPageAsSite();
         } }
     ];
     actions.forEach((it) => body.appendChild(buildActionRow(it)));
@@ -637,25 +668,34 @@
     // 编辑/新增表单
     body.appendChild(buildSiteForm(siteEditId !== null ? sites.find((s) => s.id === siteEditId) : null));
     body.appendChild(el('div', 'aisa-lm-sep'));
-    // 列表
+    // 列表（渲染前统一排序：置顶区在前）
     const listWrap = el('div', 'aisa-lm-list');
     if (!sites || sites.length === 0) {
       listWrap.appendChild(el('div', 'aisa-lm-empty', '暂无站点'));
     } else {
-      sites.forEach((s, idx) => {
-        const row = el('div', 'aisa-lm-cruitem');
+      const sorted = storage && storage.sortSites ? storage.sortSites(sites) : sites;
+      sorted.forEach((s, idx) => {
+        const row = el('div', 'aisa-lm-cruitem' + (s.pinned ? ' is-pinned' : ''));
         const iconHtml = siteIconHtml(s.icon, s.name);
+        const pinBtn = s.pinned
+          ? '<button class="aisa-lm-btn sm active" data-act="pin" title="取消置顶">📌</button>'
+          : '<button class="aisa-lm-btn sm" data-act="pin" title="置顶">📍</button>';
         row.innerHTML =
           iconHtml +
           '<div class="aisa-lm-ctext"><div class="aisa-lm-clabel">' + escapeHtml(s.name) + '</div><div class="aisa-lm-curl">' + escapeHtml(s.url) + '</div></div>' +
           '<div class="aisa-lm-cact">' +
+            pinBtn +
             '<button class="aisa-lm-btn sm" data-act="up" title="上移">▲</button>' +
             '<button class="aisa-lm-btn sm" data-act="down" title="下移">▼</button>' +
             '<button class="aisa-lm-btn sm" data-act="edit" title="编辑">✎</button>' +
             '<button class="aisa-lm-btn sm danger" data-act="del" title="删除">✕</button>' +
           '</div>';
-        row.querySelector('[data-act="up"]').addEventListener('click', (e) => { e.stopPropagation(); moveSite(sites, idx, -1); });
-        row.querySelector('[data-act="down"]').addEventListener('click', (e) => { e.stopPropagation(); moveSite(sites, idx, 1); });
+        row.querySelector('[data-act="pin"]').addEventListener('click', (e) => {
+          e.stopPropagation();
+          if (storage && storage.togglePin) { storage.saveSites(storage.togglePin(sites, s.id)); }
+        });
+        row.querySelector('[data-act="up"]').addEventListener('click', (e) => { e.stopPropagation(); moveSite(sorted, idx, -1); });
+        row.querySelector('[data-act="down"]').addEventListener('click', (e) => { e.stopPropagation(); moveSite(sorted, idx, 1); });
         row.querySelector('[data-act="edit"]').addEventListener('click', (e) => { e.stopPropagation(); siteEditId = s.id; renderTab(); });
         row.querySelector('[data-act="del"]').addEventListener('click', (e) => {
           e.stopPropagation();
@@ -677,25 +717,45 @@
       '<input class="aisa-lm-input block" id="aisa-site-name" placeholder="名称（如 ChatGPT）" value="' + escapeHtml(editing ? editing.name : '') + '">' +
       '<input class="aisa-lm-input block" id="aisa-site-url" placeholder="网址 https://…" value="' + escapeHtml(editing ? editing.url : '') + '">' +
       '<input class="aisa-lm-input block" id="aisa-site-icon" placeholder="图标 emoji（可空，如 🤖）" maxlength="4" value="' + escapeHtml(editing && editing.icon && !/^https?:|^assets\//.test(editing.icon) ? editing.icon : '') + '">' +
+      '<label class="aisa-lm-check"><input type="checkbox" id="aisa-site-pin" ' + (editing && editing.pinned ? 'checked' : '') + '><span>置顶到首位</span></label>' +
       '<div class="aisa-lm-formbtns"><button class="aisa-lm-btn primary sm" id="aisa-site-save">' + (editing ? '保存' : '添加') + '</button>' + (editing ? '<button class="aisa-lm-btn sm" id="aisa-site-cancel">取消</button>' : '') + '</div>';
     wrap.querySelector('#aisa-site-save').addEventListener('click', async (e) => {
       e.stopPropagation();
       const name = wrap.querySelector('#aisa-site-name').value.trim();
       const url = wrap.querySelector('#aisa-site-url').value.trim();
       const icon = wrap.querySelector('#aisa-site-icon').value.trim();
+      const pinned = wrap.querySelector('#aisa-site-pin').checked;
       if (!name || !url) { toast('请填写名称和网址', 1500); return; }
       const storage = window.AISA && window.AISA.storage;
       if (!storage || !storage.getSites || !storage.saveSites) { toast('保存失败', 1500); return; }
       let sites = (await storage.getSites()) || [];
       if (!sites.length) { const r = await safeSendMessage({ type: 'AISA_GET_DEFAULT_SITES' }); sites = (r && r.sites) || []; }
-      if (siteEditId !== null) {
-        sites = sites.map((s) => s.id === siteEditId ? Object.assign({}, s, { name: name, url: url, icon: icon || '🔗' }) : s);
+      const wasEdit = siteEditId !== null;
+      if (wasEdit) {
+        // 编辑：保留原 pinnedAt；若从非置顶切到置顶则打时间戳
+        sites = sites.map((s) => {
+          if (s.id !== siteEditId) return s;
+          return Object.assign({}, s, {
+            name: name,
+            url: url,
+            icon: icon || '🔗',
+            pinned: pinned,
+            pinnedAt: pinned ? (s.pinnedAt || Date.now()) : null
+          });
+        });
       } else {
-        sites.push({ id: 'custom_' + Date.now(), name: name, url: url, icon: icon || '🔗' });
+        sites.push({
+          id: 'custom_' + Date.now(),
+          name: name,
+          url: url,
+          icon: icon || '🔗',
+          pinned: pinned,
+          pinnedAt: pinned ? Date.now() : null
+        });
       }
-      await storage.saveSites(sites);
+      await storage.saveSites(storage.sortSites(sites));
       siteEditId = null;
-      toast(siteEditId !== null ? '已保存' : '已添加', 1200);
+      toast(wasEdit ? '已保存' : '已添加', 1200);
       renderTab();
     });
     if (editing) {

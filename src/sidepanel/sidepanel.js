@@ -35,6 +35,10 @@
   let currentWindowId = null; // 当前侧边栏所属窗口（兜底记忆）
   let currentTabId = null; // 当前 sidePanel 实例绑定的标签（每个标签独立实例 → 按标签记站点）
 
+  // 拖拽状态（HTML5 DnD）
+  let dragSrcId = null;       // 被拖站点的 id
+  let suppressClick = false;  // 拖拽结束后抑制一次合成 click（避免误切站点）
+
   // ---------- 工具 ----------
   function showToast(msg, duration) {
     toastEl.textContent = msg;
@@ -105,9 +109,6 @@
   }
 
   // 站点图标 src 归一化：兼容 'assets/..' 、'../../assets/..' 、'http(s)://' 三种格式。
-  // 历史原因 background 默认值用 'assets/..'（无 ../），options/sidepanel 默认值用 '../../assets/..'，
-  // 若 storage 里混存了无 ../ 的格式，直接当相对路径会在 src/sidepanel/ 下解析失败（裂图）。
-  // 统一用 chrome.runtime.getURL 转成 chrome-extension:// 绝对路径，任何上下文都对。
   function siteIconSrc(icon) {
     if (!icon) return '';
     if (/^https?:\/\//.test(icon)) return icon;
@@ -119,10 +120,15 @@
 
   function renderTabs() {
     tabsEl.innerHTML = '';
+    // 渲染前统一排序：置顶区在前（晚置顶更靠前），非置顶区保持拖拽顺序
+    currentSites = storage.sortSites(currentSites);
+
     currentSites.forEach((site) => {
       const btn = document.createElement('button');
-      btn.className = 'site-tab';
+      btn.className = 'site-tab' + (site.pinned ? ' is-pinned' : '');
       btn.dataset.id = site.id;
+      // 仅非置顶区可拖拽；置顶区顺序由时间固定
+      if (!site.pinned) btn.draggable = true;
 
       let iconHtml = '';
       const src = siteIconSrc(site.icon);
@@ -132,10 +138,137 @@
         iconHtml = escapeHtml(site.icon || '•');
       }
 
-      btn.innerHTML = '<span class="ico">' + iconHtml + '</span><span>' + escapeHtml(site.name) + '</span>';
-      btn.addEventListener('click', () => selectSite(site));
+      const pinHtml = site.pinned ? '<span class="pin-badge" title="已置顶（长按拖动无效）">📌</span>' : '';
+      btn.innerHTML =
+        '<span class="ico">' + iconHtml + '</span>' +
+        '<span class="lbl">' + escapeHtml(site.name) + '</span>' +
+        pinHtml;
+
+      // 左键单击 → 切站点（拖拽后抑制一次合成 click）
+      btn.addEventListener('click', (e) => {
+        if (suppressClick) { suppressClick = false; return; }
+        selectSite(site);
+      });
+      // 右键 → 切换置顶（快捷操作，不占额外 UI）
+      btn.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        togglePinSite(site.id);
+      });
+
+      bindDragHandlers(btn, site);
       tabsEl.appendChild(btn);
     });
+
+    // 末尾「+」按钮：快捷添加站点
+    const addBtn = document.createElement('button');
+    addBtn.className = 'site-tab site-tab-add';
+    addBtn.type = 'button';
+    addBtn.title = '添加新站点';
+    addBtn.innerHTML = '<span class="ico">＋</span>';
+    addBtn.addEventListener('click', () => openSiteAddModal());
+    tabsEl.appendChild(addBtn);
+  }
+
+  // ---------- 置顶 ----------
+  async function togglePinSite(id) {
+    currentSites = storage.togglePin(currentSites, id);
+    await storage.saveSites(currentSites);
+    renderTabs();
+    showToast(currentSites.find((s) => s.id === id) && currentSites.find((s) => s.id === id).pinned ? '已置顶' : '已取消置顶', 1200);
+  }
+
+  // ---------- 拖拽排序（仅非置顶区） ----------
+  function bindDragHandlers(btn, site) {
+    btn.addEventListener('dragstart', (e) => {
+      if (site.pinned) { e.preventDefault(); return; } // 置顶区不可拖
+      dragSrcId = site.id;
+      btn.classList.add('dragging');
+      try { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', site.id); } catch (_) {}
+    });
+    btn.addEventListener('dragover', (e) => {
+      if (!dragSrcId || site.pinned || site.id === dragSrcId) return;
+      e.preventDefault();
+      const rect = btn.getBoundingClientRect();
+      const after = (e.clientX - rect.left) > rect.width / 2;
+      btn.classList.toggle('drag-over-left', !after);
+      btn.classList.toggle('drag-over-right', after);
+    });
+    btn.addEventListener('dragleave', () => {
+      btn.classList.remove('drag-over-left', 'drag-over-right');
+    });
+    btn.addEventListener('drop', async (e) => {
+      e.preventDefault();
+      btn.classList.remove('drag-over-left', 'drag-over-right');
+      if (!dragSrcId || site.pinned || site.id === dragSrcId) { dragSrcId = null; return; }
+      const rect = btn.getBoundingClientRect();
+      const after = (e.clientX - rect.left) > rect.width / 2;
+      reorderSites(dragSrcId, site.id, after);
+      dragSrcId = null;
+    });
+    btn.addEventListener('dragend', () => {
+      btn.classList.remove('dragging');
+      // 清掉残留指示线
+      Array.from(tabsEl.querySelectorAll('.drag-over-left,.drag-over-right')).forEach((el) =>
+        el.classList.remove('drag-over-left', 'drag-over-right')
+      );
+      suppressClick = true; // 抑制拖拽后合成的 click
+      dragSrcId = null;
+    });
+  }
+
+  // 把 fromId 移到 toId 之前/之后（只在非置顶区内部重排）
+  async function reorderSites(fromId, toId, after) {
+    const sorted = storage.sortSites(currentSites);
+    const fromIdx = sorted.findIndex((s) => s.id === fromId);
+    const toIdx = sorted.findIndex((s) => s.id === toId);
+    if (fromIdx < 0 || toIdx < 0) return;
+    const [moved] = sorted.splice(fromIdx, 1);
+    // 移除后 toIdx 可能位移，重新定位
+    const newToIdx = sorted.findIndex((s) => s.id === toId);
+    sorted.splice(after ? newToIdx + 1 : newToIdx, 0, moved);
+    currentSites = sorted;
+    await storage.saveSites(currentSites);
+    renderTabs();
+  }
+
+  // ---------- 快捷添加站点 modal ----------
+  function openSiteAddModal() {
+    const modal = document.getElementById('site-add-modal');
+    if (!modal) return;
+    modal.classList.remove('hidden');
+    const nameInput = document.getElementById('sa-name');
+    const urlInput = document.getElementById('sa-url');
+    const iconInput = document.getElementById('sa-icon');
+    nameInput.value = '';
+    urlInput.value = '';
+    iconInput.value = '';
+    setTimeout(() => nameInput.focus(), 0);
+  }
+
+  function closeSiteAddModal() {
+    const modal = document.getElementById('site-add-modal');
+    if (modal) modal.classList.add('hidden');
+  }
+
+  async function submitSiteAdd() {
+    const name = (document.getElementById('sa-name').value || '').trim();
+    const url = (document.getElementById('sa-url').value || '').trim();
+    const icon = (document.getElementById('sa-icon').value || '').trim();
+    if (!name || !url) { showToast('请填写名称和网址', 2000); return; }
+    const finalUrl = /^https?:\/\//i.test(url) ? url : 'https://' + url;
+    const newSite = {
+      id: 'custom_' + Date.now(),
+      name: name,
+      url: finalUrl,
+      icon: icon || '🔗',
+      pinned: false
+    };
+    currentSites.push(newSite);
+    await storage.saveSites(currentSites);
+    renderTabs();
+    closeSiteAddModal();
+    showToast('已添加站点：' + name, 1500);
+    selectSite(newSite);
   }
 
   function escapeHtml(s) {
@@ -147,8 +280,9 @@
 
   async function selectSite(site) {
     currentSite = site;
-    // 高亮 tab
+    // 高亮 tab（data-id 过滤，跳过「+」按钮）
     Array.from(tabsEl.children).forEach((el) => {
+      if (!el.dataset || !el.dataset.id) return;
       el.classList.toggle('active', el.dataset.id === site.id);
     });
     showOverlay('正在加载 ' + site.name + ' …');
@@ -219,6 +353,18 @@
 
   document.getElementById('btn-history').addEventListener('click', () => {
     chrome.tabs.create({ url: chrome.runtime.getURL('src/history/history.html') });
+  });
+
+  // ---------- 快捷添加站点 modal 事件 ----------
+  document.getElementById('sa-cancel').addEventListener('click', closeSiteAddModal);
+  document.getElementById('sa-save').addEventListener('click', submitSiteAdd);
+  document.getElementById('sa-backdrop').addEventListener('click', closeSiteAddModal);
+  // Enter 提交、Esc 关闭
+  ['sa-name', 'sa-url', 'sa-icon'].forEach((id) => {
+    document.getElementById(id).addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); submitSiteAdd(); }
+      else if (e.key === 'Escape') { e.preventDefault(); closeSiteAddModal(); }
+    });
   });
 
   // ---------- 接收 content script 经 background 转发的引用 ----------
@@ -364,5 +510,15 @@
       }
       await chrome.storage.local.set({ aisa_pending_compose: [] });
     } catch (e) {}
+  }
+
+  // ---------- 跨页同步：站点列表被其他页面（设置页/悬浮窗）改动时，重新加载并刷新 tab 栏 ----------
+  if (chrome.storage && chrome.storage.onChanged) {
+    chrome.storage.onChanged.addListener((changes, area) => {
+      if (area !== 'local') return;
+      if (changes.aisa_sites) {
+        loadSites();
+      }
+    });
   }
 })();

@@ -503,6 +503,20 @@ html.aisa-supercopy img {
   transition: background 0.12s ease;
 }
 #aisa-launcher-menu .aisa-lm-cruitem:hover { background: #f8fafc; }
+#aisa-launcher-menu .aisa-lm-cruitem.is-pinned { background: #eef2ff; }
+#aisa-launcher-menu .aisa-lm-cruitem.is-pinned:hover { background: #e0e7ff; }
+#aisa-launcher-menu .aisa-lm-btn.sm.active { background: #6366f1; color: #fff; }
+/* 置顶勾选项（站点表单内） */
+#aisa-launcher-menu .aisa-lm-check {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #475569;
+  margin-top: 2px;
+  cursor: pointer;
+}
+#aisa-launcher-menu .aisa-lm-check input { margin: 0; }
 #aisa-launcher-menu .aisa-lm-cicon {
   flex: none;
   width: 22px;

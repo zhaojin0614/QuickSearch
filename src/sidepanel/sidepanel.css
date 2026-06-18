@@ -238,6 +238,128 @@ body {
   object-fit: contain;
 }
 
+/* 置顶徽标 + 「+」按钮 + 拖拽 */
+.site-tab .lbl { /* 名称容器，方便后续调间距 */ }
+.site-tab .pin-badge {
+  font-size: 9px;
+  line-height: 1;
+  margin-left: -2px;
+  filter: grayscale(0.3);
+  opacity: 0.9;
+}
+.site-tab.is-pinned {
+  border-color: #c7d2fe;
+  background: #eef2ff;
+  color: #3730a3;
+}
+.site-tab.is-pinned.active {
+  background: #4338ca;
+  border-color: #4338ca;
+  color: #fff;
+}
+
+/* 末尾「+」加号按钮 */
+.site-tab-add {
+  border-style: dashed;
+  border-color: #cbd5e1;
+  color: #94a3b8;
+  background: transparent;
+  min-width: 32px;
+  padding: 6px 10px;
+  font-size: 16px;
+  cursor: pointer;
+}
+.site-tab-add:hover {
+  border-color: #6366f1;
+  color: #6366f1;
+  background: #eef2ff;
+}
+
+/* 拖拽态：被拖元素半透明，目标位置插入指示线 */
+.site-tab.dragging {
+  opacity: 0.35;
+}
+.site-tab.drag-over-left {
+  box-shadow: -2px 0 0 0 #6366f1;
+}
+.site-tab.drag-over-right {
+  box-shadow: 2px 0 0 0 #6366f1;
+}
+
+/* 快捷添加站点 modal */
+.site-add-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.site-add-modal.hidden { display: none; }
+.site-add-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.35);
+  backdrop-filter: blur(2px);
+}
+.site-add-card {
+  position: relative;
+  width: 280px;
+  background: #ffffff;
+  border-radius: 10px;
+  box-shadow: 0 12px 32px -6px rgba(0, 0, 0, 0.25);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.site-add-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #0f172a;
+}
+.site-add-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 7px 10px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  font-size: 13px;
+  color: #0f172a;
+  outline: none;
+  transition: border-color 0.15s;
+}
+.site-add-input:focus { border-color: #6366f1; }
+.site-add-hint {
+  font-size: 11px;
+  color: #94a3b8;
+  line-height: 1.4;
+}
+.site-add-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 4px;
+}
+.site-add-btn {
+  padding: 6px 14px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  border: none;
+  cursor: pointer;
+}
+.site-add-btn-cancel {
+  background: #f1f5f9;
+  color: #475569;
+}
+.site-add-btn-cancel:hover { background: #e2e8f0; }
+.site-add-btn-confirm {
+  background: #6366f1;
+  color: #fff;
+}
+.site-add-btn-confirm:hover { background: #4f46e5; }
+
 /* ---------- iframe ---------- */
 .iframe-wrap {
   flex: 1 1 auto;

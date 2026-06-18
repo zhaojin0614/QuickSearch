@@ -122,6 +122,28 @@ textarea {
   color: #dc2626;
 }
 
+/* 置顶：行高亮 + pin 按钮激活态 */
+.site-row.is-pinned {
+  background: #eef2ff;
+  border-color: #c7d2fe;
+}
+.site-row button[data-act="pin"] {
+  background: #f1f5f9;
+  color: #475569;
+}
+.site-row button[data-act="pin"].active {
+  background: #6366f1;
+  color: #fff;
+}
+.site-row button[data-act="pin"]:hover {
+  background: #e0e7ff;
+  color: #4338ca;
+}
+.site-row button[data-act="pin"].active:hover {
+  background: #4f46e5;
+  color: #fff;
+}
+
 .sites-add {
   display: flex;
   gap: 6px;

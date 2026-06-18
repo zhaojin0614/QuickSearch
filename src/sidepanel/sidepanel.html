@@ -93,6 +93,22 @@
     <button id="btn-history" title="剪贴板历史">📋 历史</button>
   </div>
 
+  <!-- 快捷添加站点 modal -->
+  <div id="site-add-modal" class="site-add-modal hidden">
+    <div class="site-add-backdrop" id="sa-backdrop"></div>
+    <div class="site-add-card">
+      <div class="site-add-title">添加新站点</div>
+      <input type="text" id="sa-name" class="site-add-input" placeholder="名称（如 ChatGPT）" maxlength="20" />
+      <input type="text" id="sa-url" class="site-add-input" placeholder="网址 https://…" />
+      <input type="text" id="sa-icon" class="site-add-input" placeholder="图标 emoji（可空）" maxlength="4" />
+      <div class="site-add-hint">提示：tab 上右键可置顶/取消置顶；非置顶 tab 可拖拽排序。</div>
+      <div class="site-add-actions">
+        <button id="sa-cancel" class="site-add-btn site-add-btn-cancel">取消</button>
+        <button id="sa-save" class="site-add-btn site-add-btn-confirm">添加</button>
+      </div>
+    </div>
+  </div>
+
   <!-- toast 提示 -->
   <div id="toast" class="toast hidden"></div>
 

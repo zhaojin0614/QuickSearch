@@ -19,6 +19,9 @@
   let sites = null;
   let prompts = [];
 
+  // 编辑站点时暂存置顶态（edit 是「删后重加」模式，需手动带回 pinned/pinnedAt）
+  let editingPinned = null;   // { pinned, pinnedAt }
+
   const $ = (id) => document.getElementById(id);
 
   let saveTimeout = null;
@@ -105,14 +108,27 @@
         chrome.storage.local.remove('aisa_temp_prompt');
       }
     });
+
+    // 跨页同步：站点列表被其他页面（侧边栏/悬浮窗）改动时，重新加载并刷新列表。
+    // 自身的 scheduleSave 也会触发本回调，但内容一致，rerender 幂等无副作用。
+    chrome.storage.onChanged.addListener((changes, area) => {
+      if (area !== 'local' || !changes.aisa_sites) return;
+      const next = changes.aisa_sites.newValue;
+      if (Array.isArray(next)) {
+        sites = next;
+        renderSites();
+      }
+    });
   }
 
   function renderSites() {
     const list = $('sites-list');
     list.innerHTML = '';
+    // 渲染前统一排序：置顶区在前（晚置顶更靠前），非置顶区保持现有顺序
+    sites = storage.sortSites(sites);
     sites.forEach((s, idx) => {
       const row = document.createElement('div');
-      row.className = 'site-row';
+      row.className = 'site-row' + (s.pinned ? ' is-pinned' : '');
       let iconHtml = '';
       // 图标路径归一化：兼容 'assets/..'（background 默认值，无 ../）与 '../../assets/..'（本页默认值）。
       // 统一用 getURL 转绝对路径，避免 storage 里混存格式时相对路径解析失败导致裂图。
@@ -124,10 +140,15 @@
         iconHtml = escapeHtml(s.icon || '•');
       }
 
+      const pinBtn = s.pinned
+        ? '<button data-act="pin" class="active" title="取消置顶">📌</button>'
+        : '<button data-act="pin" title="置顶到首位">📍</button>';
+
       row.innerHTML =
         '<span class="ico">' + iconHtml + '</span>' +
         '<span class="name">' + escapeHtml(s.name || '') + '</span>' +
         '<span class="url">' + escapeHtml(s.url || '') + '</span>' +
+        pinBtn +
         '<button data-act="up" title="上移">▲</button>' +
         '<button data-act="down" title="下移">▼</button>' +
         '<button data-act="edit" title="编辑">✎</button>' +
@@ -136,6 +157,11 @@
       if (idx === 0) row.querySelector('[data-act="up"]').disabled = true;
       if (idx === sites.length - 1) row.querySelector('[data-act="down"]').disabled = true;
 
+      row.querySelector('[data-act="pin"]').addEventListener('click', () => {
+        sites = storage.togglePin(sites, s.id);
+        renderSites();
+        scheduleSave();
+      });
       row.querySelector('[data-act="up"]').addEventListener('click', () => {
         if (idx === 0) return;
         [sites[idx - 1], sites[idx]] = [sites[idx], sites[idx - 1]];
@@ -152,6 +178,8 @@
         $('site-name').value = s.name || '';
         $('site-url').value = s.url || '';
         $('site-icon').value = s.icon || '';
+        // 暂存置顶态，re-add 时带回（edit 是「删后重加」，否则会丢 pinned）
+        editingPinned = { pinned: !!s.pinned, pinnedAt: s.pinnedAt || null };
         sites.splice(idx, 1);
         renderSites();
         scheduleSave();
@@ -181,7 +209,17 @@
       status('请填写名称和 URL', true);
       return;
     }
-    sites.push({ id: 'custom_' + Date.now(), name, url, icon: icon || '🔗' });
+    // 编辑模式：带回原置顶态；新增模式：默认不置顶。用完即清。
+    const pin = editingPinned || { pinned: false, pinnedAt: null };
+    sites.push({
+      id: 'custom_' + Date.now(),
+      name,
+      url,
+      icon: icon || '🔗',
+      pinned: !!pin.pinned,
+      pinnedAt: pin.pinnedAt || null
+    });
+    editingPinned = null;
     $('site-name').value = '';
     $('site-url').value = '';
     $('site-icon').value = '';
