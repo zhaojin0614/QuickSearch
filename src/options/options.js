@@ -178,13 +178,15 @@
       });
       row.querySelector('[data-act="up"]').addEventListener('click', () => {
         if (atZoneTop) return;
-        [sites[idx - 1], sites[idx]] = [sites[idx], sites[idx - 1]];
+        // 上移 = 放到前一项之前（after=false）
+        sites = storage.reorderSite(sites, s.id, sites[idx - 1].id, false);
         renderSites();
         scheduleSave();
       });
       row.querySelector('[data-act="down"]').addEventListener('click', () => {
         if (atZoneBottom) return;
-        [sites[idx + 1], sites[idx]] = [sites[idx], sites[idx + 1]];
+        // 下移 = 放到后一项之后（after=true）
+        sites = storage.reorderSite(sites, s.id, sites[idx + 1].id, true);
         renderSites();
         scheduleSave();
       });
@@ -192,8 +194,8 @@
         $('site-name').value = s.name || '';
         $('site-url').value = s.url || '';
         $('site-icon').value = s.icon || '';
-        // 暂存置顶态，re-add 时带回（edit 是「删后重加」，否则会丢 pinned）
-        editingPinned = { pinned: !!s.pinned };
+        // 暂存置顶态 + 优先级，re-add 时带回（edit 是「删后重加」，否则会丢这些字段）
+        editingPinned = { pinned: !!s.pinned, order: s.order, pinnedOrder: s.pinnedOrder };
         sites.splice(idx, 1);
         renderSites();
         scheduleSave();
@@ -254,17 +256,9 @@
     });
   }
 
-  // 纵向重排：fromId 移到 toId 上/下方，区域隔离校验。
+  // 纵向重排：fromId 移到 toId 上/下方。区域隔离由 storage.reorderSite 校验。
   function reorderOptionsSites(fromId, toId, after) {
-    const sorted = storage.sortSites(sites);
-    const fromSite = sorted.find((s) => s.id === fromId);
-    const toSite = sorted.find((s) => s.id === toId);
-    if (!fromSite || !toSite || !!fromSite.pinned !== !!toSite.pinned) return;
-    const fromIdx = sorted.findIndex((s) => s.id === fromId);
-    const [moved] = sorted.splice(fromIdx, 1);
-    const newToIdx = sorted.findIndex((s) => s.id === toId);
-    sorted.splice(after ? newToIdx + 1 : newToIdx, 0, moved);
-    sites = sorted;
+    sites = storage.reorderSite(sites, fromId, toId, after);
     renderSites();
     scheduleSave();
   }
@@ -284,15 +278,31 @@
       status('请填写名称和 URL', true);
       return;
     }
-    // 编辑模式：带回原置顶态；新增模式：默认不置顶。用完即清。
+    // 编辑模式：保留原 order/pinnedOrder（仅改名/网址/图标）；新增模式：用 addSite 分配 order。
     const pin = editingPinned || { pinned: false };
-    sites.push({
-      id: 'custom_' + Date.now(),
-      name,
-      url,
-      icon: icon || '🔗',
-      pinned: !!pin.pinned
-    });
+    if (editingPinned && typeof editingPinned.order === 'number') {
+      // 编辑重加：保留原优先级
+      sites.push({
+        id: 'custom_' + Date.now(),
+        name,
+        url,
+        icon: icon || '🔗',
+        pinned: !!pin.pinned,
+        order: pin.order,
+        pinnedOrder: pin.pinnedOrder
+      });
+    } else {
+      sites = storage.addSite(sites, {
+        id: 'custom_' + Date.now(),
+        name,
+        url,
+        icon: icon || '🔗'
+      });
+      // 新增项若要求置顶，用 togglePin 放置顶区末尾
+      if (pin.pinned && sites.length) {
+        sites = storage.togglePin(sites, sites[sites.length - 1].id);
+      }
+    }
     editingPinned = null;
     $('site-name').value = '';
     $('site-url').value = '';

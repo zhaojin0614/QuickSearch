@@ -416,7 +416,7 @@
       return;
     }
     const name = (document.title || location.hostname || '新站点').slice(0, 20);
-    sites.push({ id: 'custom_' + Date.now(), name: name, url: href, icon: '🔗', pinned: false });
+    sites = storage.addSite(sites, { id: 'custom_' + Date.now(), name: name, url: href, icon: '🔗' });
     await storage.saveSites(storage.sortSites(sites));
     toast('已添加站点：' + name, 2000);
   }
@@ -755,12 +755,11 @@
           sites = storage.togglePin(sites, siteEditId);
         }
       } else {
-        sites.push({
+        sites = storage.addSite(sites, {
           id: 'custom_' + Date.now(),
           name: name,
           url: url,
-          icon: icon || '🔗',
-          pinned: false
+          icon: icon || '🔗'
         });
         if (pinned) sites = storage.togglePin(sites, sites[sites.length - 1].id);
       }
@@ -781,9 +780,13 @@
     const arr = sites.slice();
     // 区域隔离：不能跨置顶/非置顶边界
     if (!!arr[idx].pinned !== !!arr[ni].pinned) return;
-    const tmp = arr[idx]; arr[idx] = arr[ni]; arr[ni] = tmp;
     const storage = window.AISA && window.AISA.storage;
-    if (storage && storage.saveSites) { await storage.saveSites(storage.sortSites(arr)); renderTab(); }
+    if (storage && storage.reorderSite && storage.saveSites) {
+      // dir=-1 上移 = 放到前一项之前；dir=+1 下移 = 放到后一项之后
+      const next = storage.reorderSite(arr, arr[idx].id, arr[ni].id, dir > 0);
+      await storage.saveSites(storage.sortSites(next));
+      renderTab();
+    }
   }
 
   // 站点列表纵向拖拽：置顶区/非置顶区各自内部可拖，跨区被拒绝
@@ -816,13 +819,12 @@
       if (!src || !dst || !!src.pinned !== !!dst.pinned) { siteDragSrcId = null; return; }
       const rect = row.getBoundingClientRect();
       const after = (e.clientY - rect.top) > rect.height / 2;
-      // 在 sorted 上重排
-      const fromIdx = sorted.findIndex((s) => s.id === siteDragSrcId);
-      const toIdx = sorted.findIndex((s) => s.id === row.dataset.id);
-      const [moved] = sorted.splice(fromIdx, 1);
-      const newToIdx = sorted.findIndex((s) => s.id === row.dataset.id);
-      sorted.splice(after ? newToIdx + 1 : newToIdx, 0, moved);
-      if (storage && storage.saveSites) { await storage.saveSites(sorted); renderTab(); }
+      // 通过 reorderSite 更新对应区优先级（区域隔离由其校验）
+      if (storage && storage.reorderSite && storage.saveSites) {
+        const next = storage.reorderSite(sorted, siteDragSrcId, row.dataset.id, after);
+        await storage.saveSites(storage.sortSites(next));
+        renderTab();
+      }
       siteDragSrcId = null;
     });
     row.addEventListener('dragend', () => {
@@ -992,10 +994,14 @@
 
     // 3. 拦截 addEventListener 形式的事件（capture 阶段 + stopImmediatePropagation）
     //    注意：这里只阻止"阻止默认"的行为，让 copy/contextmenu/selectstart 恢复
+    //    例外：本扩展自己注入的悬浮控制台（#aisa-launcher-menu）内的事件放行，
+    //    否则会吞掉其中站点列表的拖拽（dragstart）等自定义交互。
     ['copy', 'cut', 'contextmenu', 'selectstart', 'dragstart', 'paste', 'beforecopy', 'beforecut'].forEach((evName) => {
       window.addEventListener(
         evName,
         function (e) {
+          // 来自本扩展悬浮控制台的事件，不拦截
+          if (e.target && e.target.closest && e.target.closest('#aisa-launcher-menu')) return;
           // 允许默认行为：立即停止后续可能 preventDefault 的监听器
           e.stopImmediatePropagation();
         },
@@ -1004,6 +1010,7 @@
       document.addEventListener(
         evName,
         function (e) {
+          if (e.target && e.target.closest && e.target.closest('#aisa-launcher-menu')) return;
           e.stopImmediatePropagation();
         },
         true

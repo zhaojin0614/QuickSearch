@@ -222,18 +222,9 @@
     });
   }
 
-  // 把 fromId 移到 toId 之前/之后。区域隔离：两者 pinned 态必须相同，否则不动。
+  // 把 fromId 移到 toId 之前/之后。区域隔离由 storage.reorderSite 校验。
   async function reorderSites(fromId, toId, after) {
-    const sorted = storage.sortSites(currentSites);
-    const fromSite = sorted.find((s) => s.id === fromId);
-    const toSite = sorted.find((s) => s.id === toId);
-    if (!fromSite || !toSite) return;
-    if (!!fromSite.pinned !== !!toSite.pinned) return; // 跨区拒绝
-    const fromIdx = sorted.findIndex((s) => s.id === fromId);
-    const [moved] = sorted.splice(fromIdx, 1);
-    const newToIdx = sorted.findIndex((s) => s.id === toId);
-    sorted.splice(after ? newToIdx + 1 : newToIdx, 0, moved);
-    currentSites = sorted;
+    currentSites = storage.reorderSite(currentSites, fromId, toId, after);
     await storage.saveSites(currentSites);
     renderTabs();
   }
@@ -263,14 +254,13 @@
     const icon = (document.getElementById('sa-icon').value || '').trim();
     if (!name || !url) { showToast('请填写名称和网址', 2000); return; }
     const finalUrl = /^https?:\/\//i.test(url) ? url : 'https://' + url;
-    const newSite = {
+    currentSites = storage.addSite(currentSites, {
       id: 'custom_' + Date.now(),
       name: name,
       url: finalUrl,
-      icon: icon || '🔗',
-      pinned: false
-    };
-    currentSites.push(newSite);
+      icon: icon || '🔗'
+    });
+    const newSite = currentSites[currentSites.length - 1];
     await storage.saveSites(currentSites);
     renderTabs();
     closeSiteAddModal();
