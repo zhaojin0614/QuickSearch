@@ -120,15 +120,24 @@
 
   function renderTabs() {
     tabsEl.innerHTML = '';
-    // 渲染前统一排序：置顶区在前（晚置顶更靠前），非置顶区保持拖拽顺序
+    // 最前面「+」按钮：快捷添加站点（放在所有 tab 之前）
+    const addBtn = document.createElement('button');
+    addBtn.className = 'site-tab site-tab-add';
+    addBtn.type = 'button';
+    addBtn.title = '添加新站点';
+    addBtn.innerHTML = '<span class="ico">＋</span>';
+    addBtn.addEventListener('click', () => openSiteAddModal());
+    tabsEl.appendChild(addBtn);
+
+    // 渲染前统一排序：仅按区域分组（置顶区在前、非置顶区在后），组内保留拖拽顺序
     currentSites = storage.sortSites(currentSites);
 
     currentSites.forEach((site) => {
       const btn = document.createElement('button');
       btn.className = 'site-tab' + (site.pinned ? ' is-pinned' : '');
       btn.dataset.id = site.id;
-      // 仅非置顶区可拖拽；置顶区顺序由时间固定
-      if (!site.pinned) btn.draggable = true;
+      // 置顶区与非置顶区都支持拖拽（跨区拖拽会被 reorderSites 拒绝）
+      btn.draggable = true;
 
       let iconHtml = '';
       const src = siteIconSrc(site.icon);
@@ -138,7 +147,7 @@
         iconHtml = escapeHtml(site.icon || '•');
       }
 
-      const pinHtml = site.pinned ? '<span class="pin-badge" title="已置顶（长按拖动无效）">📌</span>' : '';
+      const pinHtml = site.pinned ? '<span class="pin-badge" title="已置顶">📌</span>' : '';
       btn.innerHTML =
         '<span class="ico">' + iconHtml + '</span>' +
         '<span class="lbl">' + escapeHtml(site.name) + '</span>' +
@@ -158,15 +167,6 @@
       bindDragHandlers(btn, site);
       tabsEl.appendChild(btn);
     });
-
-    // 末尾「+」按钮：快捷添加站点
-    const addBtn = document.createElement('button');
-    addBtn.className = 'site-tab site-tab-add';
-    addBtn.type = 'button';
-    addBtn.title = '添加新站点';
-    addBtn.innerHTML = '<span class="ico">＋</span>';
-    addBtn.addEventListener('click', () => openSiteAddModal());
-    tabsEl.appendChild(addBtn);
   }
 
   // ---------- 置顶 ----------
@@ -174,19 +174,22 @@
     currentSites = storage.togglePin(currentSites, id);
     await storage.saveSites(currentSites);
     renderTabs();
-    showToast(currentSites.find((s) => s.id === id) && currentSites.find((s) => s.id === id).pinned ? '已置顶' : '已取消置顶', 1200);
+    const s = currentSites.find((x) => x.id === id);
+    showToast(s && s.pinned ? '已置顶' : '已取消置顶', 1200);
   }
 
-  // ---------- 拖拽排序（仅非置顶区） ----------
+  // ---------- 拖拽排序（置顶区/非置顶区各自内部可拖，跨区被拒绝） ----------
   function bindDragHandlers(btn, site) {
     btn.addEventListener('dragstart', (e) => {
-      if (site.pinned) { e.preventDefault(); return; } // 置顶区不可拖
       dragSrcId = site.id;
       btn.classList.add('dragging');
       try { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', site.id); } catch (_) {}
     });
     btn.addEventListener('dragover', (e) => {
-      if (!dragSrcId || site.pinned || site.id === dragSrcId) return;
+      if (!dragSrcId || site.id === dragSrcId) return;
+      // 区域隔离：被拖站点与目标站点必须同为置顶/非置顶，否则不允许放置
+      const src = currentSites.find((s) => s.id === dragSrcId);
+      if (!src || !!src.pinned !== !!site.pinned) return;
       e.preventDefault();
       const rect = btn.getBoundingClientRect();
       const after = (e.clientX - rect.left) > rect.width / 2;
@@ -199,7 +202,10 @@
     btn.addEventListener('drop', async (e) => {
       e.preventDefault();
       btn.classList.remove('drag-over-left', 'drag-over-right');
-      if (!dragSrcId || site.pinned || site.id === dragSrcId) { dragSrcId = null; return; }
+      if (!dragSrcId || site.id === dragSrcId) { dragSrcId = null; return; }
+      // 再次校验同区
+      const src = currentSites.find((s) => s.id === dragSrcId);
+      if (!src || !!src.pinned !== !!site.pinned) { dragSrcId = null; return; }
       const rect = btn.getBoundingClientRect();
       const after = (e.clientX - rect.left) > rect.width / 2;
       reorderSites(dragSrcId, site.id, after);
@@ -216,14 +222,15 @@
     });
   }
 
-  // 把 fromId 移到 toId 之前/之后（只在非置顶区内部重排）
+  // 把 fromId 移到 toId 之前/之后。区域隔离：两者 pinned 态必须相同，否则不动。
   async function reorderSites(fromId, toId, after) {
     const sorted = storage.sortSites(currentSites);
+    const fromSite = sorted.find((s) => s.id === fromId);
+    const toSite = sorted.find((s) => s.id === toId);
+    if (!fromSite || !toSite) return;
+    if (!!fromSite.pinned !== !!toSite.pinned) return; // 跨区拒绝
     const fromIdx = sorted.findIndex((s) => s.id === fromId);
-    const toIdx = sorted.findIndex((s) => s.id === toId);
-    if (fromIdx < 0 || toIdx < 0) return;
     const [moved] = sorted.splice(fromIdx, 1);
-    // 移除后 toIdx 可能位移，重新定位
     const newToIdx = sorted.findIndex((s) => s.id === toId);
     sorted.splice(after ? newToIdx + 1 : newToIdx, 0, moved);
     currentSites = sorted;

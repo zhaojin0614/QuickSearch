@@ -144,6 +144,21 @@ textarea {
   color: #fff;
 }
 
+/* 拖拽手柄 + 纵向拖拽指示线 */
+.site-row .drag-handle {
+  cursor: grab;
+  color: #cbd5e1;
+  font-size: 14px;
+  user-select: none;
+  flex: none;
+  width: 14px;
+  text-align: center;
+}
+.site-row .drag-handle:active { cursor: grabbing; }
+.site-row.dragging { opacity: 0.4; }
+.site-row.drag-over-top { box-shadow: 0 -2px 0 0 #6366f1; }
+.site-row.drag-over-bottom { box-shadow: 0 2px 0 0 #6366f1; }
+
 .sites-add {
   display: flex;
   gap: 6px;

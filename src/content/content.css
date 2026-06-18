@@ -517,6 +517,20 @@ html.aisa-supercopy img {
   cursor: pointer;
 }
 #aisa-launcher-menu .aisa-lm-check input { margin: 0; }
+/* 站点列表拖拽手柄 + 纵向拖拽指示线 */
+#aisa-launcher-menu .aisa-lm-drag {
+  flex: none;
+  color: #cbd5e1;
+  font-size: 14px;
+  cursor: grab;
+  user-select: none;
+  width: 12px;
+  text-align: center;
+}
+#aisa-launcher-menu .aisa-lm-drag:active { cursor: grabbing; }
+#aisa-launcher-menu .aisa-lm-cruitem.dragging { opacity: 0.4; }
+#aisa-launcher-menu .aisa-lm-cruitem.drag-over-top { box-shadow: 0 -2px 0 0 #6366f1; }
+#aisa-launcher-menu .aisa-lm-cruitem.drag-over-bottom { box-shadow: 0 2px 0 0 #6366f1; }
 #aisa-launcher-menu .aisa-lm-cicon {
   flex: none;
   width: 22px;

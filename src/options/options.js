@@ -19,8 +19,12 @@
   let sites = null;
   let prompts = [];
 
-  // 编辑站点时暂存置顶态（edit 是「删后重加」模式，需手动带回 pinned/pinnedAt）
-  let editingPinned = null;   // { pinned, pinnedAt }
+  // 编辑站点时暂存置顶态（edit 是「删后重加」模式，需手动带回 pinned）
+  let editingPinned = null;   // { pinned }
+
+  // 纵向拖拽状态
+  let dragSrcId = null;
+  let suppressClick = false;
 
   const $ = (id) => document.getElementById(id);
 
@@ -124,11 +128,16 @@
   function renderSites() {
     const list = $('sites-list');
     list.innerHTML = '';
-    // 渲染前统一排序：置顶区在前（晚置顶更靠前），非置顶区保持现有顺序
+    // 渲染前统一排序：仅按区域分组（置顶区在前、非置顶区在后），组内保留拖拽顺序
     sites = storage.sortSites(sites);
+    // 找到各区域的边界索引，用于禁用跨区的 ▲▼
+    const firstOther = sites.findIndex((s) => !s.pinned); // 第一个非置顶
+
     sites.forEach((s, idx) => {
       const row = document.createElement('div');
       row.className = 'site-row' + (s.pinned ? ' is-pinned' : '');
+      row.dataset.id = s.id;
+      row.draggable = true; // 纵向拖拽（置顶区/非置顶区各自内部可拖，跨区被拒绝）
       let iconHtml = '';
       // 图标路径归一化：兼容 'assets/..'（background 默认值，无 ../）与 '../../assets/..'（本页默认值）。
       // 统一用 getURL 转绝对路径，避免 storage 里混存格式时相对路径解析失败导致裂图。
@@ -142,9 +151,10 @@
 
       const pinBtn = s.pinned
         ? '<button data-act="pin" class="active" title="取消置顶">📌</button>'
-        : '<button data-act="pin" title="置顶到首位">📍</button>';
+        : '<button data-act="pin" title="置顶">📍</button>';
 
       row.innerHTML =
+        '<span class="drag-handle" title="拖拽排序">⠿</span>' +
         '<span class="ico">' + iconHtml + '</span>' +
         '<span class="name">' + escapeHtml(s.name || '') + '</span>' +
         '<span class="url">' + escapeHtml(s.url || '') + '</span>' +
@@ -154,8 +164,12 @@
         '<button data-act="edit" title="编辑">✎</button>' +
         '<button data-act="del" title="删除">✕</button>';
 
-      if (idx === 0) row.querySelector('[data-act="up"]').disabled = true;
-      if (idx === sites.length - 1) row.querySelector('[data-act="down"]').disabled = true;
+      // ▲▼ 边界禁用：区域内首个不可上移，区域内末个不可下移
+      const isPinned = !!s.pinned;
+      const atZoneTop = isPinned ? idx === 0 : idx === firstOther;
+      const atZoneBottom = isPinned ? idx === firstOther - 1 : idx === sites.length - 1;
+      if (atZoneTop) row.querySelector('[data-act="up"]').disabled = true;
+      if (atZoneBottom) row.querySelector('[data-act="down"]').disabled = true;
 
       row.querySelector('[data-act="pin"]').addEventListener('click', () => {
         sites = storage.togglePin(sites, s.id);
@@ -163,13 +177,13 @@
         scheduleSave();
       });
       row.querySelector('[data-act="up"]').addEventListener('click', () => {
-        if (idx === 0) return;
+        if (atZoneTop) return;
         [sites[idx - 1], sites[idx]] = [sites[idx], sites[idx - 1]];
         renderSites();
         scheduleSave();
       });
       row.querySelector('[data-act="down"]').addEventListener('click', () => {
-        if (idx === sites.length - 1) return;
+        if (atZoneBottom) return;
         [sites[idx + 1], sites[idx]] = [sites[idx], sites[idx + 1]];
         renderSites();
         scheduleSave();
@@ -179,7 +193,7 @@
         $('site-url').value = s.url || '';
         $('site-icon').value = s.icon || '';
         // 暂存置顶态，re-add 时带回（edit 是「删后重加」，否则会丢 pinned）
-        editingPinned = { pinned: !!s.pinned, pinnedAt: s.pinnedAt || null };
+        editingPinned = { pinned: !!s.pinned };
         sites.splice(idx, 1);
         renderSites();
         scheduleSave();
@@ -190,8 +204,69 @@
         renderSites();
         scheduleSave();
       });
+
+      bindRowDragHandlers(row, list);
       list.appendChild(row);
     });
+  }
+
+  // ---------- 纵向拖拽（置顶区/非置顶区各自内部可拖，跨区被拒绝） ----------
+  function bindRowDragHandlers(row, list) {
+    row.addEventListener('dragstart', (e) => {
+      dragSrcId = row.dataset.id;
+      row.classList.add('dragging');
+      try { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', row.dataset.id); } catch (_) {}
+    });
+    row.addEventListener('dragover', (e) => {
+      if (!dragSrcId || row.dataset.id === dragSrcId) return;
+      // 区域隔离校验
+      const src = sites.find((s) => s.id === dragSrcId);
+      const dst = sites.find((s) => s.id === row.dataset.id);
+      if (!src || !dst || !!src.pinned !== !!dst.pinned) return;
+      e.preventDefault();
+      const rect = row.getBoundingClientRect();
+      const after = (e.clientY - rect.top) > rect.height / 2;
+      row.classList.toggle('drag-over-top', !after);
+      row.classList.toggle('drag-over-bottom', after);
+    });
+    row.addEventListener('dragleave', () => {
+      row.classList.remove('drag-over-top', 'drag-over-bottom');
+    });
+    row.addEventListener('drop', async (e) => {
+      e.preventDefault();
+      row.classList.remove('drag-over-top', 'drag-over-bottom');
+      if (!dragSrcId || row.dataset.id === dragSrcId) { dragSrcId = null; return; }
+      const src = sites.find((s) => s.id === dragSrcId);
+      const dst = sites.find((s) => s.id === row.dataset.id);
+      if (!src || !dst || !!src.pinned !== !!dst.pinned) { dragSrcId = null; return; }
+      const rect = row.getBoundingClientRect();
+      const after = (e.clientY - rect.top) > rect.height / 2;
+      reorderOptionsSites(dragSrcId, row.dataset.id, after);
+      dragSrcId = null;
+    });
+    row.addEventListener('dragend', () => {
+      row.classList.remove('dragging');
+      Array.from(list.querySelectorAll('.drag-over-top,.drag-over-bottom')).forEach((el) =>
+        el.classList.remove('drag-over-top', 'drag-over-bottom')
+      );
+      suppressClick = true;
+      dragSrcId = null;
+    });
+  }
+
+  // 纵向重排：fromId 移到 toId 上/下方，区域隔离校验。
+  function reorderOptionsSites(fromId, toId, after) {
+    const sorted = storage.sortSites(sites);
+    const fromSite = sorted.find((s) => s.id === fromId);
+    const toSite = sorted.find((s) => s.id === toId);
+    if (!fromSite || !toSite || !!fromSite.pinned !== !!toSite.pinned) return;
+    const fromIdx = sorted.findIndex((s) => s.id === fromId);
+    const [moved] = sorted.splice(fromIdx, 1);
+    const newToIdx = sorted.findIndex((s) => s.id === toId);
+    sorted.splice(after ? newToIdx + 1 : newToIdx, 0, moved);
+    sites = sorted;
+    renderSites();
+    scheduleSave();
   }
 
   function renderOverrides() {
@@ -210,14 +285,13 @@
       return;
     }
     // 编辑模式：带回原置顶态；新增模式：默认不置顶。用完即清。
-    const pin = editingPinned || { pinned: false, pinnedAt: null };
+    const pin = editingPinned || { pinned: false };
     sites.push({
       id: 'custom_' + Date.now(),
       name,
       url,
       icon: icon || '🔗',
-      pinned: !!pin.pinned,
-      pinnedAt: pin.pinnedAt || null
+      pinned: !!pin.pinned
     });
     editingPinned = null;
     $('site-name').value = '';

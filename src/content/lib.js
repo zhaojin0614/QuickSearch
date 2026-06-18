@@ -280,6 +280,7 @@
   let historyFilter = '';
   let siteEditId = null;   // 正在编辑的站点 id（null=新增）
   let promptEditIdx = null; // 正在编辑的提示词索引（null=新增）
+  let siteDragSrcId = null; // 站点列表纵向拖拽：被拖站点 id
 
   function ensureLauncherMenu() {
     if (launcherMenu) return launcherMenu;
@@ -674,13 +675,17 @@
       listWrap.appendChild(el('div', 'aisa-lm-empty', '暂无站点'));
     } else {
       const sorted = storage && storage.sortSites ? storage.sortSites(sites) : sites;
+      const firstOther = sorted.findIndex((s) => !s.pinned); // 第一个非置顶（区域边界）
       sorted.forEach((s, idx) => {
         const row = el('div', 'aisa-lm-cruitem' + (s.pinned ? ' is-pinned' : ''));
+        row.dataset.id = s.id;
+        row.draggable = true; // 纵向拖拽（置顶区/非置顶区各自内部可拖，跨区被拒绝）
         const iconHtml = siteIconHtml(s.icon, s.name);
         const pinBtn = s.pinned
           ? '<button class="aisa-lm-btn sm active" data-act="pin" title="取消置顶">📌</button>'
           : '<button class="aisa-lm-btn sm" data-act="pin" title="置顶">📍</button>';
         row.innerHTML =
+          '<span class="aisa-lm-drag" title="拖拽排序">⠿</span>' +
           iconHtml +
           '<div class="aisa-lm-ctext"><div class="aisa-lm-clabel">' + escapeHtml(s.name) + '</div><div class="aisa-lm-curl">' + escapeHtml(s.url) + '</div></div>' +
           '<div class="aisa-lm-cact">' +
@@ -690,12 +695,18 @@
             '<button class="aisa-lm-btn sm" data-act="edit" title="编辑">✎</button>' +
             '<button class="aisa-lm-btn sm danger" data-act="del" title="删除">✕</button>' +
           '</div>';
+        // 区域边界：▲▼ 在区域内首位/末位禁用
+        const isPinned = !!s.pinned;
+        const atZoneTop = isPinned ? idx === 0 : idx === firstOther;
+        const atZoneBottom = isPinned ? idx === firstOther - 1 : idx === sorted.length - 1;
+        if (atZoneTop) row.querySelector('[data-act="up"]').disabled = true;
+        if (atZoneBottom) row.querySelector('[data-act="down"]').disabled = true;
         row.querySelector('[data-act="pin"]').addEventListener('click', (e) => {
           e.stopPropagation();
           if (storage && storage.togglePin) { storage.saveSites(storage.togglePin(sites, s.id)); }
         });
-        row.querySelector('[data-act="up"]').addEventListener('click', (e) => { e.stopPropagation(); moveSite(sorted, idx, -1); });
-        row.querySelector('[data-act="down"]').addEventListener('click', (e) => { e.stopPropagation(); moveSite(sorted, idx, 1); });
+        row.querySelector('[data-act="up"]').addEventListener('click', (e) => { e.stopPropagation(); if (!atZoneTop) moveSite(sorted, idx, -1); });
+        row.querySelector('[data-act="down"]').addEventListener('click', (e) => { e.stopPropagation(); if (!atZoneBottom) moveSite(sorted, idx, 1); });
         row.querySelector('[data-act="edit"]').addEventListener('click', (e) => { e.stopPropagation(); siteEditId = s.id; renderTab(); });
         row.querySelector('[data-act="del"]').addEventListener('click', (e) => {
           e.stopPropagation();
@@ -703,6 +714,7 @@
           const next = sites.filter((x) => x.id !== s.id);
           if (storage && storage.saveSites) { storage.saveSites(next); toast('已删除', 1200); }
         });
+        bindSiteRowDrag(row, sorted, listWrap, storage);
         listWrap.appendChild(row);
       });
     }
@@ -732,26 +744,25 @@
       if (!sites.length) { const r = await safeSendMessage({ type: 'AISA_GET_DEFAULT_SITES' }); sites = (r && r.sites) || []; }
       const wasEdit = siteEditId !== null;
       if (wasEdit) {
-        // 编辑：保留原 pinnedAt；若从非置顶切到置顶则打时间戳
-        sites = sites.map((s) => {
-          if (s.id !== siteEditId) return s;
-          return Object.assign({}, s, {
-            name: name,
-            url: url,
-            icon: icon || '🔗',
-            pinned: pinned,
-            pinnedAt: pinned ? (s.pinnedAt || Date.now()) : null
-          });
-        });
+        // 编辑：切置顶时用 togglePin 的语义（放置顶区末尾/取消到非置顶区末尾）
+        sites = sites.map((s) => (s.id === siteEditId ? Object.assign({}, s, {
+          name: name,
+          url: url,
+          icon: icon || '🔗'
+        }) : s));
+        const edited = sites.find((s) => s.id === siteEditId);
+        if (edited && !!edited.pinned !== pinned) {
+          sites = storage.togglePin(sites, siteEditId);
+        }
       } else {
         sites.push({
           id: 'custom_' + Date.now(),
           name: name,
           url: url,
           icon: icon || '🔗',
-          pinned: pinned,
-          pinnedAt: pinned ? Date.now() : null
+          pinned: false
         });
+        if (pinned) sites = storage.togglePin(sites, sites[sites.length - 1].id);
       }
       await storage.saveSites(storage.sortSites(sites));
       siteEditId = null;
@@ -768,9 +779,59 @@
     const ni = idx + dir;
     if (ni < 0 || ni >= sites.length) return;
     const arr = sites.slice();
+    // 区域隔离：不能跨置顶/非置顶边界
+    if (!!arr[idx].pinned !== !!arr[ni].pinned) return;
     const tmp = arr[idx]; arr[idx] = arr[ni]; arr[ni] = tmp;
     const storage = window.AISA && window.AISA.storage;
-    if (storage && storage.saveSites) { await storage.saveSites(arr); renderTab(); }
+    if (storage && storage.saveSites) { await storage.saveSites(storage.sortSites(arr)); renderTab(); }
+  }
+
+  // 站点列表纵向拖拽：置顶区/非置顶区各自内部可拖，跨区被拒绝
+  function bindSiteRowDrag(row, sorted, listWrap, storage) {
+    row.addEventListener('dragstart', (e) => {
+      siteDragSrcId = row.dataset.id;
+      row.classList.add('dragging');
+      try { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', row.dataset.id); } catch (_) {}
+    });
+    row.addEventListener('dragover', (e) => {
+      if (!siteDragSrcId || row.dataset.id === siteDragSrcId) return;
+      const src = sorted.find((s) => s.id === siteDragSrcId);
+      const dst = sorted.find((s) => s.id === row.dataset.id);
+      if (!src || !dst || !!src.pinned !== !!dst.pinned) return; // 跨区拒绝
+      e.preventDefault();
+      const rect = row.getBoundingClientRect();
+      const after = (e.clientY - rect.top) > rect.height / 2;
+      row.classList.toggle('drag-over-top', !after);
+      row.classList.toggle('drag-over-bottom', after);
+    });
+    row.addEventListener('dragleave', () => {
+      row.classList.remove('drag-over-top', 'drag-over-bottom');
+    });
+    row.addEventListener('drop', async (e) => {
+      e.preventDefault();
+      row.classList.remove('drag-over-top', 'drag-over-bottom');
+      if (!siteDragSrcId || row.dataset.id === siteDragSrcId) { siteDragSrcId = null; return; }
+      const src = sorted.find((s) => s.id === siteDragSrcId);
+      const dst = sorted.find((s) => s.id === row.dataset.id);
+      if (!src || !dst || !!src.pinned !== !!dst.pinned) { siteDragSrcId = null; return; }
+      const rect = row.getBoundingClientRect();
+      const after = (e.clientY - rect.top) > rect.height / 2;
+      // 在 sorted 上重排
+      const fromIdx = sorted.findIndex((s) => s.id === siteDragSrcId);
+      const toIdx = sorted.findIndex((s) => s.id === row.dataset.id);
+      const [moved] = sorted.splice(fromIdx, 1);
+      const newToIdx = sorted.findIndex((s) => s.id === row.dataset.id);
+      sorted.splice(after ? newToIdx + 1 : newToIdx, 0, moved);
+      if (storage && storage.saveSites) { await storage.saveSites(sorted); renderTab(); }
+      siteDragSrcId = null;
+    });
+    row.addEventListener('dragend', () => {
+      row.classList.remove('dragging');
+      Array.from(listWrap.querySelectorAll('.drag-over-top,.drag-over-bottom')).forEach((el) =>
+        el.classList.remove('drag-over-top', 'drag-over-bottom')
+      );
+      siteDragSrcId = null;
+    });
   }
 
   // ---------------- 提示词 tab（CRUD）----------------
